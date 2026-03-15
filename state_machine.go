@@ -1,11 +1,11 @@
 package ungo
 
-type StateMachine[S comparable, E any] struct {
+type StateMachine[S comparable] struct {
 	current     S
 	transitions map[S]map[string]S
 }
 
-func (f *StateMachine[S, E]) Trigger(event string) {
+func (f *StateMachine[S]) Trigger(event string) {
 	cur, ok := f.transitions[f.current]
 	if !ok {
 		return
@@ -17,12 +17,12 @@ func (f *StateMachine[S, E]) Trigger(event string) {
 	f.current = next
 }
 
-func (f *StateMachine[S, E]) Current() S {
+func (f *StateMachine[S]) Current() S {
 	return f.current
 }
 
-func NewStateMachine[S comparable, E any](initial S, transitions map[S]map[string]S) *StateMachine[S, E] {
-	return &StateMachine[S, E]{
+func NewStateMachine[S comparable](initial S, transitions map[S]map[string]S) *StateMachine[S] {
+	return &StateMachine[S]{
 		current:     initial,
 		transitions: transitions,
 	}
