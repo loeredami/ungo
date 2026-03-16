@@ -4,6 +4,18 @@ type Constraint[T comparable] struct {
 	possibleValues Set[T]
 }
 
+func NewConstraint[T comparable]() Constraint[T] {
+	return Constraint[T]{}
+}
+
+func (c Constraint[T]) Add(value T) {
+	c.possibleValues[value] = struct{}{}
+}
+
+func (c Constraint[T]) Remove(value T) {
+	c.possibleValues.Remove(value)
+}
+
 func (c Constraint[T]) Narrow(f func(T) bool) Constraint[T] {
 	result := Constraint[T]{}
 	result.possibleValues = make(Set[T])
