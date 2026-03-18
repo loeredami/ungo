@@ -105,3 +105,11 @@ func (ll *LinkedList[T]) Remove(index int) {
 	current.next = current.next.next
 	ll.size--
 }
+
+func (ll *LinkedList[T]) ForEach(fn func(index int, value T)) {
+	current := ll.head
+	for i := 0; current != nil; current = current.next {
+		fn(i, current.value)
+		i++
+	}
+}

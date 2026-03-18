@@ -23,7 +23,26 @@ var (
 		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 		return sig
 	})
+
+	shutdownHooks = NewLazy(func() *LinkedList[func()] {
+		return NewLinkedList[func()]()
+	})
+
+	ShutdownTimeout = NewLazy(func() time.Duration {
+		return time.Second * 30
+	})
 )
+
+func startSignalWatcher() {
+	go func() {
+		sig := <-signals.Value() // Triggers initialization
+		if sig != nil {
+			cancelWorkers()
+			// In a large app, you might want to log which signal was caught here
+			os.Exit(ExitSuccess)
+		}
+	}()
+}
 
 func cancelWorkers() {
 	if !workers.IsInitialized() {
@@ -43,33 +62,34 @@ func waitForWorkers() {
 	}
 }
 
-func Main(m func(argc int, argv []string) Optional[int], shouldWaitForWorkers Optional[bool], subProcesses Optional[[]SubProcess]) {
+// Register shudown hooks
+func OnShutdown(fn func()) {
+	shutdownHooks.Value().Add(fn)
+}
+
+func runShutdownHooks() {
+	if !shutdownHooks.IsInitialized() {
+		return
+	}
+
+	done := make(chan struct{})
 	go func() {
-		if subProcesses.HasValue() {
-			go func() {
-				waiters := make([]SubProcessLink, 0, len(subProcesses.Value()))
-				for _, sp := range subProcesses.Value() {
-					waiters = append(waiters, StartSubProcess(sp.fn, sp.on_finish))
-				}
-				for _, waiter := range waiters {
-					WaitForSubProcess(waiter)
-				}
-			}()
-		}
-
-		exitCode := m(len(os.Args), os.Args)
-		if exitCode.HasValue() {
-			cancelWorkers()
-			os.Exit(exitCode.Value())
-		}
-
-		if shouldWaitForWorkers.HasValue() && shouldWaitForWorkers.Value() {
-			waitForWorkers()
-		}
-		os.Exit(ExitSuccess)
+		shutdownHooks.Value().ForEach(func(index int, fn func()) {
+			fn()
+		})
+		close(done)
 	}()
 
-	for {
+	select {
+	case <-done:
+	case <-time.After(ShutdownTimeout.Value()):
+		os.Exit(ExitGenericFailure)
+	}
+}
+func Main(m func(argc int, argv []string) Optional[int], shouldWaitForWorkers Optional[bool], subProcesses Optional[[]SubProcess]) {
+	defer runShutdownHooks()
+
+	OnShutdown(func() {
 		if workers.IsInitialized() {
 			workers.Value().ForEach(func(key int, worker *Worker) {
 				if worker.isCancelled {
@@ -86,9 +106,34 @@ func Main(m func(argc int, argv []string) Optional[int], shouldWaitForWorkers Op
 			default:
 			}
 		}
+	})
 
-		time.Sleep(time.Millisecond * 100)
+	if signals.IsInitialized() {
+		startSignalWatcher()
 	}
+
+	if subProcesses.HasValue() {
+		go func() {
+			waiters := make([]SubProcessLink, 0, len(subProcesses.Value()))
+			for _, sp := range subProcesses.Value() {
+				waiters = append(waiters, StartSubProcess(sp.fn, sp.on_finish))
+			}
+			for _, waiter := range waiters {
+				WaitForSubProcess(waiter)
+			}
+		}()
+	}
+
+	exitCode := m(len(os.Args), os.Args)
+	if exitCode.HasValue() {
+		cancelWorkers()
+		os.Exit(exitCode.Value())
+	}
+
+	if shouldWaitForWorkers.HasValue() && shouldWaitForWorkers.Value() {
+		waitForWorkers()
+	}
+	os.Exit(ExitSuccess)
 }
 
 type SubProcessLink chan struct{}
