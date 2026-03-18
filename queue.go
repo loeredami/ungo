@@ -12,22 +12,20 @@ func (q *Queue[T]) Push(element T) {
 	q.elements = append(q.elements, element)
 }
 
-func (q *Queue[T]) Pop() T {
+func (q *Queue[T]) Pop() Optional[T] {
 	if len(q.elements) == 0 {
-		var zero T
-		return zero
+		return EmptyOptional[T]()
 	}
 	element := q.elements[0]
 	q.elements = q.elements[1:]
-	return element
+	return MakeOptional(element)
 }
 
-func (q *Queue[T]) Peek() T {
+func (q *Queue[T]) Peek() Optional[T] {
 	if len(q.elements) == 0 {
-		var zero T
-		return zero
+		return EmptyOptional[T]()
 	}
-	return q.elements[0]
+	return MakeOptional(q.elements[0])
 }
 
 func (q *Queue[T]) IsEmpty() bool {
