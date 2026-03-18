@@ -21,6 +21,18 @@ func (e Result[T]) Error() error {
 	return e.err
 }
 
+func (e Result[T]) OnSuccess(f func(T)) {
+	if e.err == nil {
+		f(e.value)
+	}
+}
+
+func (e Result[T]) OnError(f func(error)) {
+	if e.err != nil {
+		f(e.err)
+	}
+}
+
 func VFail[T any](err error) Result[T] {
 	return Result[T]{err: err}
 }

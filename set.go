@@ -1,50 +1,43 @@
 package ungo
 
-type Set[T comparable] map[T]struct{}
+type Set[T comparable] FastMap[T, struct{}]
 
 func NewSet[T comparable](elements ...T) Set[T] {
-	s := make(Set[T])
+	s := Set[T]{}
 	for _, elem := range elements {
-		s[elem] = struct{}{}
+		s.Add(elem)
 	}
 	return s
 }
 
-func (s Set[T]) Add(element T) {
-	s[element] = struct{}{}
+func (s *Set[T]) Add(element T) {
+	(*FastMap[T, struct{}])(s).Set(element, struct{}{})
 }
 
-func (s Set[T]) Remove(element T) {
-	delete(s, element)
+func (s *Set[T]) Remove(element T) {
+	(*FastMap[T, struct{}])(s).Delete(element)
 }
 
 func (s Set[T]) Contains(element T) bool {
-	_, exists := s[element]
-	return exists
+	return (*FastMap[T, struct{}])(&s).Contains(element)
 }
 
 func (s Set[T]) Size() int {
-	return len(s)
+	return (*FastMap[T, struct{}])(&s).Size()
 }
 
-func (s Set[T]) Clear() {
-	for key := range s {
-		delete(s, key)
-	}
+func (s *Set[T]) Clear() {
+	(*FastMap[T, struct{}])(s).Clear()
 }
 
-func (s Set[T]) ToSlice() []T {
-	slice := make([]T, 0, len(s))
-	for key := range s {
-		slice = append(slice, key)
-	}
-	return slice
+func (s *Set[T]) ToSlice() []T {
+	return (*FastMap[T, struct{}])(s).Keys()
 }
 
 func SetFromSlice[T comparable](slice []T) Set[T] {
-	s := make(Set[T])
+	s := Set[T]{}
 	for _, elem := range slice {
-		s[elem] = struct{}{}
+		s.Add(elem)
 	}
 	return s
 }

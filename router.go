@@ -25,7 +25,12 @@ func NewRouter[In, Out any](candidates ...func(In) Out) *Router[In, Out] {
 	}
 }
 
+// Transform is an alias for Process.
 func (r *Router[In, Out]) Transform(input In) Out {
+	return r.Process(input)
+}
+
+func (r *Router[In, Out]) Process(input In) Out {
 	bestIdx := r.selectBestPath()
 
 	start := time.Now()

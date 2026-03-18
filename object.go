@@ -3,21 +3,21 @@ package ungo
 import "fmt"
 
 type Object struct {
-	Data      map[string]any
-	Methods   map[string]func(*Object, ...any) Result[any]
+	Data      FastMap[string, any]
+	Methods   FastMap[string, func(*Object, ...any) Result[any]]
 	Prototype *Object
 }
 
 func NewObject() *Object {
 	return &Object{
-		Data:      make(map[string]any),
-		Methods:   make(map[string]func(*Object, ...any) Result[any]),
+		Data:      FastMap[string, any]{},
+		Methods:   FastMap[string, func(*Object, ...any) Result[any]]{},
 		Prototype: nil,
 	}
 }
 
 func (o *Object) Get(key string) Result[any] {
-	if value, ok := o.Data[key]; ok {
+	if value, ok := o.Data.Get(key); ok {
 		return Result[any]{value: value}
 	}
 	if o.Prototype != nil {
@@ -27,11 +27,11 @@ func (o *Object) Get(key string) Result[any] {
 }
 
 func (o *Object) Set(key string, value any) {
-	o.Data[key] = value
+	o.Data.Set(key, value)
 }
 
 func (o *Object) Call(method string, args ...any) Result[any] {
-	if fn, ok := o.Methods[method]; ok {
+	if fn, ok := o.Methods.Get(method); ok {
 		return fn(o, args...)
 	}
 	if o.Prototype != nil {
@@ -41,11 +41,11 @@ func (o *Object) Call(method string, args ...any) Result[any] {
 }
 
 func (o *Object) SetMethod(method string, fn func(*Object, ...any) Result[any]) {
-	o.Methods[method] = fn
+	o.Methods.Set(method, fn)
 }
 
 func (o *Object) GetMethod(method string) (func(*Object, ...any) Result[any], bool) {
-	if fn, ok := o.Methods[method]; ok {
+	if fn, ok := o.Methods.Get(method); ok {
 		return fn, true
 	}
 	if o.Prototype != nil {
@@ -63,14 +63,13 @@ func (o *Object) GetPrototype() *Object {
 }
 
 func (o *Object) Has(key string) bool {
-	_, ok := o.Data[key]
-	return ok
+	return o.Data.Contains(key)
 }
 
 func FromPrototype(prototype *Object) *Object {
 	return &Object{
-		Data:      make(map[string]any),
-		Methods:   make(map[string]func(*Object, ...any) Result[any]),
+		Data:      FastMap[string, any]{},
+		Methods:   FastMap[string, func(*Object, ...any) Result[any]]{},
 		Prototype: prototype,
 	}
 }

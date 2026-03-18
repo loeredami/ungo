@@ -3,7 +3,7 @@ package ungo
 import "testing"
 
 func TestLazy(t *testing.T) {
-	lazy := NewLazy(func() interface{} {
+	lazy := NewLazy(func() int {
 		return 25
 	})
 

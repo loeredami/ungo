@@ -11,9 +11,10 @@ func TestDispatcher(t *testing.T) {
 	var holder string
 	holder = "not working"
 
-	d.Subscribe(Handler[string](func(s string) {
+	fn := func(s string) {
 		holder = s
-	}))
+	}
+	d.Subscribe(Handler[string](&fn))
 
 	d.Emit("working")
 

@@ -24,3 +24,22 @@ func MakeOptional[T any](value T) Optional[T] {
 func EmptyOptional[T any]() Optional[T] {
 	return Optional[T]{valid: false}
 }
+
+func (o Optional[T]) IfPresent(f func(T)) {
+	if o.valid {
+		f(o.value)
+	}
+}
+
+func (o Optional[T]) IfAbsent(f func(*T)) {
+	if !o.valid {
+		f(&o.value)
+	}
+}
+
+func (o Optional[T]) OrElse(value T) T {
+	if !o.valid {
+		return value
+	}
+	return o.value
+}

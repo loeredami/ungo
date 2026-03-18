@@ -17,6 +17,10 @@ func NewLabeledBitmap(labels []string) *LabeledBitmap {
 	}
 }
 
+func (b *LabeledBitmap) GetBitmap() *Bitmap {
+	return b.bitmap
+}
+
 func (b *LabeledBitmap) Test(bit uint) bool {
 	return b.bitmap.Test(bit)
 }

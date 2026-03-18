@@ -13,8 +13,8 @@ func (ds *DisposableString) Dispose() {
 	fmt.Println(ds.value, "has been disposed")
 }
 
-func TestArena(t *testing.T) {
-	arena := NewArena()
+func TestResourceAerna(t *testing.T) {
+	arena := NewResourceArena()
 
 	arena.Track(&DisposableString{value: "A String"})
 	arena.Track(&DisposableString{value: "Another String"})

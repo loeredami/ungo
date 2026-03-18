@@ -6,7 +6,6 @@ import (
 	"os"
 	"reflect"
 	"sync"
-	"sync/atomic"
 	"time"
 	"unsafe"
 )
@@ -58,22 +57,23 @@ func SizedMemoize[K comparable, V any](maxSize int, fn func(K) V) func(K) V {
 }
 
 type Variable[T any] struct {
-	val  T
-	done chan struct{}
+	val T
 }
 
 func NewVariable[T any]() *Variable[T] {
-	return &Variable[T]{done: make(chan struct{})}
+	return &Variable[T]{}
 }
 
 func (v *Variable[T]) Set(val T) {
 	v.val = val
-	close(v.done)
 }
 
 func (v *Variable[T]) Get() T {
-	<-v.done
 	return v.val
+}
+
+func (v *Variable[T]) Any() *Variable[any] {
+	return &Variable[any]{val: any(v.val)}
 }
 
 type Monoid[T any] struct {
@@ -124,32 +124,38 @@ func Contract[In, Out any](
 
 func ReinterpretCast[Src, Dest any](src Src) Dest {
 	var dest Dest
+
+	size := max(unsafe.Sizeof(src), unsafe.Sizeof(dest))
+	buf := make([]byte, size)
+
+	*(*unsafe.Pointer)(unsafe.Pointer(&dest)) = unsafe.Pointer(&buf[0])
 	*(*unsafe.Pointer)(unsafe.Pointer(&dest)) = unsafe.Pointer(&src)
+
 	return dest
 }
 
-type ContextVar[Env any] struct {
+type Context[Env any] struct {
 	val       Env
 	terminate func(Env) Optional[error]
 }
 
-func NewContextVar[Env any]() *ContextVar[Env] {
-	return &ContextVar[Env]{}
+func NewContext[Env any]() *Context[Env] {
+	return &Context[Env]{}
 }
 
-func (v *ContextVar[Env]) SetTerminator(terminate func(Env) Optional[error]) {
+func (v *Context[Env]) SetTerminator(terminate func(Env) Optional[error]) {
 	v.terminate = terminate
 }
 
-func (v *ContextVar[Env]) Set(val Env) {
+func (v *Context[Env]) Set(val Env) {
 	v.val = val
 }
 
-func (v *ContextVar[Env]) Get() Env {
+func (v *Context[Env]) Get() Env {
 	return v.val
 }
 
-func With[Env any](open func() ContextVar[Env], action func(Env)) Optional[error] {
+func With[Env any](open func() Context[Env], action func(Env)) Optional[error] {
 	ctx := open()
 	action(ctx.Get())
 	if ctx.terminate != nil {
@@ -279,23 +285,36 @@ func Pooled[T any](constructor func() T) func(func(T)) {
 	}
 }
 
-func Adaptive[T, R any](fn func(T) R) func(T) Result[R] {
-	var avgLatency int64
-	threshold := int64(time.Millisecond * 500) // Shed load if > 500ms
+func Adaptive[T comparable, R any](fns []func(T) R) func(T) Result[R] {
+	best_map := make(map[T]func(T) R)
 
 	return func(arg T) Result[R] {
-		if atomic.LoadInt64(&avgLatency) > threshold {
-			return Result[R]{err: errors.New("load shedding: latency too high")}
+		best, ok := best_map[arg]
+		if !ok {
+			var bestFn func(T) R
+			var bestLatency int64 = int64(time.Second * 5) // Shed load if > 5s
+
+			for _, fn := range fns {
+				start := time.Now()
+				fn(arg)
+				duration := time.Since(start).Nanoseconds()
+
+				latency := min(duration, bestLatency)
+
+				if latency < bestLatency {
+					bestLatency = latency
+					bestFn = fn
+				}
+			}
+
+			if bestFn == nil {
+				return VFail[R](errors.New("load shedding: no suitable function"))
+			}
+
+			best = bestFn
+			best_map[arg] = best
 		}
-
-		start := time.Now()
-		res := fn(arg)
-		duration := time.Since(start).Nanoseconds()
-
-		newAvg := (atomic.LoadInt64(&avgLatency)*9 + duration) / 10
-		atomic.StoreInt64(&avgLatency, newAvg)
-
-		return Result[R]{value: res}
+		return VSuccess(best(arg))
 	}
 }
 
@@ -368,20 +387,6 @@ func Dedup[T comparable](input <-chan T) <-chan T {
 	return out
 }
 
-type Tracked[T any] struct {
-	ID        UUID
-	CreatedAt time.Time
-	Data      T
-}
-
-func WrapTracked[T any](data T) Tracked[T] {
-	return Tracked[T]{
-		ID:        NewUUID(),
-		CreatedAt: time.Now(),
-		Data:      data,
-	}
-}
-
 func Tee[T any](input <-chan T) (<-chan T, <-chan T) {
 	out1 := make(chan T)
 	out2 := make(chan T)
@@ -389,8 +394,6 @@ func Tee[T any](input <-chan T) (<-chan T, <-chan T) {
 		defer close(out1)
 		defer close(out2)
 		for item := range input {
-			// We must send to both, potentially in parallel
-			// to prevent one slow reader from blocking the other
 			var wg sync.WaitGroup
 			wg.Add(2)
 			go func(v T) { out1 <- v; wg.Done() }(item)
@@ -450,7 +453,7 @@ func Hedged[T any](delay time.Duration, task func() T) func() T {
 			return val
 		case <-time.After(delay):
 			go func() { res <- task() }()
-			return <-res // Returns the first one to finish
+			return <-res
 		}
 	}
 }
@@ -471,10 +474,7 @@ func WithDeadLetter[T any](primary, dlq chan<- T) func(T) {
 func Chunked[T any](size int, process func([]T)) func([]T) {
 	return func(data []T) {
 		for i := 0; i < len(data); i += size {
-			end := i + size
-			if end > len(data) {
-				end = len(data)
-			}
+			end := min(i+size, len(data))
 			process(data[i:end])
 		}
 	}
@@ -530,33 +530,30 @@ func GatedChannel[T any](input <-chan T, isHealthy func() bool) <-chan T {
 	return out
 }
 
-func WithQuorum[T comparable](tasks ...func() T) func() (T, error) {
-	return func() (T, error) {
+func WithQuorum[T comparable](tasks ...func() T) func() Result[T] {
+	return func() Result[T] {
 		counts := make(map[T]int)
 		for _, t := range tasks {
 			res := t()
 			counts[res]++
 			if counts[res] > len(tasks)/2 {
-				return res, nil
+				return VSuccess(res)
 			}
 		}
-		return *new(T), errors.New("no quorum reached")
+		return VFail[T](errors.New("no quorum reached"))
 	}
 }
 
-func Interlock(f1 func(), f2 func()) (func(), func()) {
+func Interlock(fs []*func()) {
 	var mu sync.Mutex
-	wrap1 := func() {
-		mu.Lock()
-		defer mu.Unlock()
-		f1()
+
+	for _, f := range fs {
+		*f = func() {
+			mu.Lock()
+			defer mu.Unlock()
+			(*f)()
+		}
 	}
-	wrap2 := func() {
-		mu.Lock()
-		defer mu.Unlock()
-		f2()
-	}
-	return wrap1, wrap2
 }
 
 func TrioMorph[A, B, C any](fn func(A) B, transform func(C) A) func(C) B {

@@ -1,5 +1,7 @@
 package ungo
 
+import "slices"
+
 type Tuple struct {
 	elements []any
 }
@@ -22,4 +24,50 @@ func (t *Tuple) Map(f func(any) any) *Tuple {
 		newElements[i] = f(element)
 	}
 	return &Tuple{elements: newElements}
+}
+
+func (t *Tuple) Filter(f func(any) bool) *Tuple {
+	var newElements []any
+	for _, element := range t.elements {
+		if f(element) {
+			newElements = append(newElements, element)
+		}
+	}
+	return &Tuple{elements: newElements}
+}
+
+func (t *Tuple) Reduce(f func(any, any) any) any {
+	result := t.elements[0]
+	for _, element := range t.elements[1:] {
+		result = f(result, element)
+	}
+	return result
+}
+
+func (t *Tuple) ForEach(f func(any)) {
+	for _, element := range t.elements {
+		f(element)
+	}
+}
+
+func (t *Tuple) Contains(element any) bool {
+	return slices.Contains(t.elements, element)
+}
+
+func (t *Tuple) IndexOf(element any) int {
+	for i, e := range t.elements {
+		if e == element {
+			return i
+		}
+	}
+	return -1
+}
+
+func (t *Tuple) LastIndexOf(element any) int {
+	for i := len(t.elements) - 1; i >= 0; i-- {
+		if t.elements[i] == element {
+			return i
+		}
+	}
+	return -1
 }

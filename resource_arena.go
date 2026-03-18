@@ -4,19 +4,19 @@ type Disposable interface {
 	Dispose()
 }
 
-type Arena struct {
+type ResourceArena struct {
 	resources []Disposable
 }
 
-func NewArena() *Arena {
-	return &Arena{}
+func NewResourceArena() *ResourceArena {
+	return &ResourceArena{}
 }
 
-func (a *Arena) Track(d Disposable) {
+func (a *ResourceArena) Track(d Disposable) {
 	a.resources = append(a.resources, d)
 }
 
-func (a *Arena) Melt() {
+func (a *ResourceArena) Melt() {
 	for _, r := range a.resources {
 		r.Dispose()
 	}

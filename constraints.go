@@ -9,7 +9,7 @@ func NewConstraint[T comparable]() Constraint[T] {
 }
 
 func (c Constraint[T]) Add(value T) {
-	c.possibleValues[value] = struct{}{}
+	c.possibleValues.Add(value)
 }
 
 func (c Constraint[T]) Remove(value T) {
@@ -18,10 +18,10 @@ func (c Constraint[T]) Remove(value T) {
 
 func (c Constraint[T]) Narrow(f func(T) bool) Constraint[T] {
 	result := Constraint[T]{}
-	result.possibleValues = make(Set[T])
-	for v := range c.possibleValues {
+	result.possibleValues = Set[T]{}
+	for _, v := range c.possibleValues.ToSlice() {
 		if f(v) {
-			result.possibleValues[v] = struct{}{}
+			result.possibleValues.Add(v)
 		}
 	}
 	return result
@@ -32,7 +32,7 @@ func (c Constraint[T]) Values() []T {
 }
 
 func (c Constraint[T]) IsNothing() bool {
-	return len(c.possibleValues) == 0
+	return c.possibleValues.Size() == 0
 }
 
 func (c Constraint[T]) IsJust() bool {

@@ -9,8 +9,8 @@ func NewDefault[T any](value T) *Default[T] {
 }
 
 func (d *Default[T]) Pass(value Optional[T]) T {
-	if value.valid {
-		return value.value
+	if value.HasValue() {
+		return value.Value()
 	}
 	return d.value
 }

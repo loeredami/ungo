@@ -38,6 +38,17 @@ func (ll *LinkedList[T]) Get(index int) Optional[T] {
 	return MakeOptional(current.value)
 }
 
+func (ll *LinkedList[T]) Set(index int, value T) {
+	if index < 0 || index >= ll.size {
+		return
+	}
+	current := ll.head
+	for range index {
+		current = current.next
+	}
+	current.value = value
+}
+
 func (ll *LinkedList[T]) Size() int {
 	return ll.size
 }
@@ -75,4 +86,22 @@ func (ll *LinkedList[T]) ToSlice() []T {
 		slice = append(slice, current.value)
 	}
 	return slice
+}
+
+func (ll *LinkedList[T]) Remove(index int) {
+	if index < 0 || index >= ll.size {
+		return
+	}
+	if ll.size == 1 {
+		ll.head = nil
+		ll.tail = nil
+		ll.size = 0
+		return
+	}
+	current := ll.head
+	for range index {
+		current = current.next
+	}
+	current.next = current.next.next
+	ll.size--
 }
