@@ -4,21 +4,23 @@ import (
 	"unsafe"
 )
 
-// We use a "Metadata" byte to store a 7-bit hash fragment.
-// This allows us to skip 99% of key comparisons.
 const (
 	hEmpty    uint8 = 0
 	hOccupied uint8 = 1 << 7
 )
 
+// SmallMap is a map implementation optimized for small sets of key-value pairs.
+// It uses a simple hash table with linear probing and a fast hash function, slightly slower than normal maps, unless you start going in the 10 millions.
 type SmallMap[K comparable, V any] struct {
 	keys     []K
 	values   []V
-	metadata []uint8 // Bit 7: occupied, Bits 0-6: hash fragment
+	metadata []uint8
 	size     int
 	mask     uintptr
 }
 
+// NewSmallMap creates a new SmallMap with the given capacity.
+// The actual capacity will be rounded up to the nearest power of 2.
 func NewSmallMap[K comparable, V any](capacity int) *SmallMap[K, V] {
 	realCap := 1
 	for realCap < capacity {
@@ -33,13 +35,10 @@ func NewSmallMap[K comparable, V any](capacity int) *SmallMap[K, V] {
 	}
 }
 
-// fastHash avoids the maphash object entirely for fixed-size types.
-// It uses a simple but very fast Wyhash-inspired mixer.
 func (fm *SmallMap[K, V]) fastHash(key K) uintptr {
 	ptr := unsafe.Pointer(&key)
 	size := unsafe.Sizeof(key)
 
-	// Fast path for 8-byte types (int64, float64, pointers)
 	if size == 8 {
 		u := *(*uint64)(ptr)
 		u ^= u >> 33
@@ -48,7 +47,6 @@ func (fm *SmallMap[K, V]) fastHash(key K) uintptr {
 		return uintptr(u)
 	}
 
-	// Fallback for other sizes (uses a basic FNV-1a inline)
 	h := uint64(14695981039346656037)
 	b := unsafe.Slice((*byte)(ptr), size)
 	for _, x := range b {
@@ -72,8 +70,6 @@ func (fm *SmallMap[K, V]) Set(key K, value V) {
 			fm.size++
 			return
 		}
-		// If the 7-bit hash fragment matches, then check the actual key.
-		// This avoids expensive equality checks for different keys.
 		if m == tag && fm.keys[idx] == key {
 			fm.values[idx] = value
 			return
