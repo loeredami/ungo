@@ -1,5 +1,9 @@
 package ungo
 
+import (
+	"unsafe"
+)
+
 type entry[K comparable, V any] struct {
 	key   K
 	value V
@@ -23,18 +27,17 @@ func NewSmallMap[K comparable, V any](capacity int) *SmallMap[K, V] {
 	}
 }
 
+func (fm *SmallMap[K, V]) hash(key K) uintptr {
+	u := *(*uintptr)(unsafe.Pointer(&key))
+	return u * 0xdeece66d
+}
+
 func (fm *SmallMap[K, V]) Set(key K, value V) {
-	// Maintain a 50% load factor for near-zero collisions
 	if fm.size*2 >= len(fm.data) {
 		fm.grow()
 	}
-	// Works for comparable types by utilizing the address/value bits
-	h := uintptr(0)
-	{
-		u := *(*uintptr)(interface{}(key).([]interface{})[0])
-	}
 
-	idx := h & fm.mask
+	idx := fm.hash(key) & fm.mask
 	for {
 		if !fm.data[idx].used {
 			fm.data[idx] = entry[K, V]{key: key, value: value, used: true}
@@ -55,13 +58,7 @@ func (fm *SmallMap[K, V]) Get(key K) (V, bool) {
 		return zero, false
 	}
 
-	h := uintptr(0)
-	{
-		u := *(*uintptr)(interface{}(key).([]interface{}[0]))
-		h = u * 0xdeece66d
-	}
-
-	idx := h & fm.mask
+	idx := fm.hash(key) & fm.mask
 	for {
 		e := &fm.data[idx]
 		if !e.used {
@@ -76,13 +73,7 @@ func (fm *SmallMap[K, V]) Get(key K) (V, bool) {
 }
 
 func (fm *SmallMap[K, V]) Delete(key K) {
-	h := uintptr(0)
-	{
-		u := *(*uintptr)(interface{}(key).([]interface{}[0]))
-		h = u * 0xdeece66d
-	}
-	idx := h & fm.mask
-
+	idx := fm.hash(key) & fm.mask
 	for {
 		if !fm.data[idx].used {
 			return
@@ -104,14 +95,7 @@ func (fm *SmallMap[K, V]) rehashChain(i uintptr) {
 		if !fm.data[j].used {
 			return
 		}
-
-		h := uintptr(0)
-		{
-			u := *(*uintptr)(interface{}(fm.data[j].key).([]interface{}[0]))
-			h = u * 0xdeece66d
-		}
-		r := h & fm.mask
-
+		r := fm.hash(fm.data[j].key) & fm.mask
 		if (j > i && (r <= i || r > j)) || (j < i && (r <= i && r > j)) {
 			fm.data[i] = fm.data[j]
 			i = j
@@ -134,7 +118,9 @@ func (fm *SmallMap[K, V]) grow() {
 	}
 }
 
-func (fm *SmallMap[K, V]) Size() int { return fm.size }
+func (fm *SmallMap[K, V]) Size() int {
+	return fm.size
+}
 
 func (fm *SmallMap[K, V]) ForEach(f func(key K, value V)) {
 	for i := range fm.data {
@@ -172,6 +158,14 @@ func (fm *SmallMap[K, V]) Clear() {
 }
 
 func (fm *SmallMap[K, V]) Contains(key K) bool {
-	_, found := fm.Get(key)
-	return found
+	idx := fm.hash(key) & fm.mask
+	for {
+		if !fm.data[idx].used {
+			return false
+		}
+		if fm.data[idx].key == key {
+			return true
+		}
+		idx = (idx + 1) & fm.mask
+	}
 }
