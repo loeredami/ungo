@@ -2,9 +2,9 @@ package ungo
 
 import "slices"
 
-var workers Lazy[*FastMap[int, *Worker]] = Lazy[*FastMap[int, *Worker]]{
-	initializer: func() *FastMap[int, *Worker] {
-		return &FastMap[int, *Worker]{}
+var workers Lazy[*SmallMap[int, *Worker]] = Lazy[*SmallMap[int, *Worker]]{
+	initializer: func() *SmallMap[int, *Worker] {
+		return &SmallMap[int, *Worker]{}
 	},
 }
 

@@ -11,27 +11,27 @@ type entry[K comparable, V any] struct {
 	occupied bool
 }
 
-type FastMap[K comparable, V any] struct {
+type SmallMap[K comparable, V any] struct {
 	buckets []entry[K, V]
 	size    int
 	mask    uint64
 	seed    maphash.Seed
 }
 
-func NewFastMap[K comparable, V any](capacity int) *FastMap[K, V] {
+func NewFastMap[K comparable, V any](capacity int) *SmallMap[K, V] {
 	realCap := 1
 	for realCap < capacity {
 		realCap <<= 1
 	}
 
-	return &FastMap[K, V]{
+	return &SmallMap[K, V]{
 		buckets: make([]entry[K, V], realCap),
 		mask:    uint64(realCap - 1),
 		seed:    maphash.MakeSeed(),
 	}
 }
 
-func (fm *FastMap[K, V]) hash(key K) uint64 {
+func (fm *SmallMap[K, V]) hash(key K) uint64 {
 	var h maphash.Hash
 	h.SetSeed(fm.seed)
 
@@ -43,7 +43,7 @@ func (fm *FastMap[K, V]) hash(key K) uint64 {
 	return h.Sum64()
 }
 
-func (fm *FastMap[K, V]) Set(key K, value V) {
+func (fm *SmallMap[K, V]) Set(key K, value V) {
 	idx := fm.hash(key) & fm.mask
 	for {
 		if !fm.buckets[idx].occupied {
@@ -61,7 +61,7 @@ func (fm *FastMap[K, V]) Set(key K, value V) {
 	}
 }
 
-func (fm *FastMap[K, V]) Get(key K) (V, bool) {
+func (fm *SmallMap[K, V]) Get(key K) (V, bool) {
 	idx := fm.hash(key) & fm.mask
 	for {
 		if !fm.buckets[idx].occupied {
@@ -75,7 +75,7 @@ func (fm *FastMap[K, V]) Get(key K) (V, bool) {
 	}
 }
 
-func (fm *FastMap[K, V]) Delete(key K) {
+func (fm *SmallMap[K, V]) Delete(key K) {
 	idx := fm.hash(key) & fm.mask
 	for {
 		if !fm.buckets[idx].occupied {
@@ -91,7 +91,7 @@ func (fm *FastMap[K, V]) Delete(key K) {
 	}
 }
 
-func (fm *FastMap[K, V]) rehashCluster(hole uint64) {
+func (fm *SmallMap[K, V]) rehashCluster(hole uint64) {
 	i := hole
 	for {
 		i = (i + 1) & fm.mask
@@ -106,11 +106,11 @@ func (fm *FastMap[K, V]) rehashCluster(hole uint64) {
 	}
 }
 
-func (fm *FastMap[K, V]) Size() int {
+func (fm *SmallMap[K, V]) Size() int {
 	return fm.size
 }
 
-func (fm *FastMap[K, V]) ForEach(f func(key K, value V)) {
+func (fm *SmallMap[K, V]) ForEach(f func(key K, value V)) {
 	for i := range fm.buckets {
 		if fm.buckets[i].occupied {
 			f(fm.buckets[i].key, fm.buckets[i].value)
@@ -118,7 +118,7 @@ func (fm *FastMap[K, V]) ForEach(f func(key K, value V)) {
 	}
 }
 
-func (fm *FastMap[K, V]) Keys() []K {
+func (fm *SmallMap[K, V]) Keys() []K {
 	keys := make([]K, 0, fm.size)
 	for i := range fm.buckets {
 		if fm.buckets[i].occupied {
@@ -128,7 +128,7 @@ func (fm *FastMap[K, V]) Keys() []K {
 	return keys
 }
 
-func (fm *FastMap[K, V]) Values() []V {
+func (fm *SmallMap[K, V]) Values() []V {
 	vals := make([]V, 0, fm.size)
 	for i := range fm.buckets {
 		if fm.buckets[i].occupied {
@@ -138,7 +138,7 @@ func (fm *FastMap[K, V]) Values() []V {
 	return vals
 }
 
-func (fm *FastMap[K, V]) Clear() {
+func (fm *SmallMap[K, V]) Clear() {
 	for i := range fm.buckets {
 		fm.buckets[i].occupied = false
 		// Clear values to help GC
@@ -150,7 +150,7 @@ func (fm *FastMap[K, V]) Clear() {
 	fm.size = 0
 }
 
-func (fm *FastMap[K, V]) Contains(key K) bool {
+func (fm *SmallMap[K, V]) Contains(key K) bool {
 	_, found := fm.Get(key)
 	return found
 }
