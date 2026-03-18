@@ -1,87 +1,156 @@
 package ungo
 
+import (
+	"hash/maphash"
+	"unsafe"
+)
+
+type entry[K comparable, V any] struct {
+	key      K
+	value    V
+	occupied bool
+}
+
 type FastMap[K comparable, V any] struct {
-	indexes []K
-	values  []V
+	buckets []entry[K, V]
+	size    int
+	mask    uint64
+	seed    maphash.Seed
+}
+
+func NewFastMap[K comparable, V any](capacity int) *FastMap[K, V] {
+	realCap := 1
+	for realCap < capacity {
+		realCap <<= 1
+	}
+
+	return &FastMap[K, V]{
+		buckets: make([]entry[K, V], realCap),
+		mask:    uint64(realCap - 1),
+		seed:    maphash.MakeSeed(),
+	}
+}
+
+func (fm *FastMap[K, V]) hash(key K) uint64 {
+	var h maphash.Hash
+	h.SetSeed(fm.seed)
+
+	kSize := unsafe.Sizeof(key)
+	ptr := unsafe.Pointer(&key)
+	b := unsafe.Slice((*byte)(ptr), kSize)
+
+	h.Write(b)
+	return h.Sum64()
 }
 
 func (fm *FastMap[K, V]) Set(key K, value V) {
-	for i := 0; i < len(fm.indexes); i++ {
-		if fm.indexes[i] == key {
-			fm.values[i] = value
+	idx := fm.hash(key) & fm.mask
+	for {
+		if !fm.buckets[idx].occupied {
+			fm.buckets[idx].key = key
+			fm.buckets[idx].value = value
+			fm.buckets[idx].occupied = true
+			fm.size++
 			return
 		}
+		if fm.buckets[idx].key == key {
+			fm.buckets[idx].value = value
+			return
+		}
+		idx = (idx + 1) & fm.mask
 	}
-	fm.indexes = append(fm.indexes, key)
-	fm.values = append(fm.values, value)
 }
 
 func (fm *FastMap[K, V]) Get(key K) (V, bool) {
-	idx := fm.indexes
-	for i := 0; i < len(idx); i++ {
-		if idx[i] == key {
-			return fm.values[i], true
+	idx := fm.hash(key) & fm.mask
+	for {
+		if !fm.buckets[idx].occupied {
+			var zero V
+			return zero, false
 		}
+		if fm.buckets[idx].key == key {
+			return fm.buckets[idx].value, true
+		}
+		idx = (idx + 1) & fm.mask
 	}
-	var zero V
-	return zero, false
 }
 
 func (fm *FastMap[K, V]) Delete(key K) {
-	for i := 0; i < len(fm.indexes); i++ {
-		if fm.indexes[i] == key {
-			lastIdx := len(fm.indexes) - 1
-
-			copy(fm.indexes[i:], fm.indexes[i+1:])
-			copy(fm.values[i:], fm.values[i+1:])
-
-			var zeroK K
-			var zeroV V
-			fm.indexes[lastIdx] = zeroK
-			fm.values[lastIdx] = zeroV
-
-			fm.indexes = fm.indexes[:lastIdx]
-			fm.values = fm.values[:lastIdx]
+	idx := fm.hash(key) & fm.mask
+	for {
+		if !fm.buckets[idx].occupied {
 			return
 		}
+		if fm.buckets[idx].key == key {
+			fm.buckets[idx].occupied = false
+			fm.size--
+			fm.rehashCluster(idx)
+			return
+		}
+		idx = (idx + 1) & fm.mask
+	}
+}
+
+func (fm *FastMap[K, V]) rehashCluster(hole uint64) {
+	i := hole
+	for {
+		i = (i + 1) & fm.mask
+		if !fm.buckets[i].occupied {
+			return
+		}
+		// Re-insert this element
+		k, v := fm.buckets[i].key, fm.buckets[i].value
+		fm.buckets[i].occupied = false
+		fm.size--
+		fm.Set(k, v)
 	}
 }
 
 func (fm *FastMap[K, V]) Size() int {
-	return len(fm.indexes)
+	return fm.size
 }
 
 func (fm *FastMap[K, V]) ForEach(f func(key K, value V)) {
-	for i := 0; i < len(fm.indexes); i++ {
-		f(fm.indexes[i], fm.values[i])
+	for i := range fm.buckets {
+		if fm.buckets[i].occupied {
+			f(fm.buckets[i].key, fm.buckets[i].value)
+		}
 	}
 }
 
 func (fm *FastMap[K, V]) Keys() []K {
-	return fm.indexes
+	keys := make([]K, 0, fm.size)
+	for i := range fm.buckets {
+		if fm.buckets[i].occupied {
+			keys = append(keys, fm.buckets[i].key)
+		}
+	}
+	return keys
 }
 
 func (fm *FastMap[K, V]) Values() []V {
-	return fm.values
+	vals := make([]V, 0, fm.size)
+	for i := range fm.buckets {
+		if fm.buckets[i].occupied {
+			vals = append(vals, fm.buckets[i].value)
+		}
+	}
+	return vals
 }
 
 func (fm *FastMap[K, V]) Clear() {
-	var zeroK K
-	var zeroV V
-	for i := range fm.indexes {
-		fm.indexes[i] = zeroK
-		fm.values[i] = zeroV
+	for i := range fm.buckets {
+		fm.buckets[i].occupied = false
+		// Clear values to help GC
+		var zeroK K
+		var zeroV V
+		fm.buckets[i].key = zeroK
+		fm.buckets[i].value = zeroV
 	}
-	fm.indexes = fm.indexes[:0]
-	fm.values = fm.values[:0]
+	fm.size = 0
 }
 
 func (fm *FastMap[K, V]) Contains(key K) bool {
-	idx := fm.indexes
-	for i := 0; i < len(idx); i++ {
-		if idx[i] == key {
-			return true
-		}
-	}
-	return false
+	_, found := fm.Get(key)
+	return found
 }
