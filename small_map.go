@@ -6,6 +6,7 @@ import (
 
 const (
 	hEmpty    uint8 = 0
+	hDeleted  uint8 = 1 // Tombstone marker
 	hOccupied uint8 = 1 << 7
 )
 
@@ -23,13 +24,10 @@ func NewSmallMap[K comparable, V any](capacity int) *SmallMap[K, V] {
 		realCap <<= 1
 	}
 
-	// We allocate a bit of extra padding at the end.
-	// This prevents "wrap-around" logic inside the hot loops.
-	padding := 8
 	return &SmallMap[K, V]{
-		keys:     make([]K, realCap+padding),
-		values:   make([]V, realCap+padding),
-		metadata: make([]uint8, realCap+padding),
+		keys:     make([]K, realCap),
+		values:   make([]V, realCap),
+		metadata: make([]uint8, realCap),
 		mask:     uintptr(realCap - 1),
 	}
 }
@@ -60,27 +58,32 @@ func (fm *SmallMap[K, V]) Set(key K, value V) {
 	idx := h & fm.mask
 	tag := uint8(h&0x7F) | hOccupied
 
-	// Optimized loop: minimal branching
+	// We track the first deleted slot we find to reuse it
+	insertIdx := uintptr(0)
+	foundDeleted := false
+
 	for {
 		m := fm.metadata[idx]
 		if m == hEmpty {
+			// If we passed a tombstone, use that instead to keep the chain short
+			if foundDeleted {
+				idx = insertIdx
+			}
 			fm.keys[idx] = key
 			fm.values[idx] = value
 			fm.metadata[idx] = tag
 			fm.size++
 			return
 		}
+		if m == hDeleted && !foundDeleted {
+			insertIdx = idx
+			foundDeleted = true
+		}
 		if m == tag && fm.keys[idx] == key {
 			fm.values[idx] = value
 			return
 		}
-
-		idx++
-		// If we hit the absolute end of the allocated slice,
-		// then and only then do we wrap back to 0.
-		if idx >= uintptr(len(fm.metadata)) {
-			idx = 0
-		}
+		idx = (idx + 1) & fm.mask
 	}
 }
 
@@ -95,14 +98,34 @@ func (fm *SmallMap[K, V]) Get(key K) (V, bool) {
 			var zero V
 			return zero, false
 		}
+		// hDeleted (Tombstone) is ignored; we keep probing
 		if m == tag && fm.keys[idx] == key {
 			return fm.values[idx], true
 		}
+		idx = (idx + 1) & fm.mask
+	}
+}
 
-		idx++
-		if idx >= uintptr(len(fm.metadata)) {
-			idx = 0
+func (fm *SmallMap[K, V]) Delete(key K) {
+	h := fm.fastHash(key)
+	idx := h & fm.mask
+	tag := uint8(h&0x7F) | hOccupied
+
+	for {
+		m := fm.metadata[idx]
+		if m == hEmpty {
+			return
 		}
+		if m == tag && fm.keys[idx] == key {
+			fm.metadata[idx] = hDeleted // Mark as tombstone
+			var zeroK K
+			var zeroV V
+			fm.keys[idx] = zeroK
+			fm.values[idx] = zeroV
+			fm.size--
+			return
+		}
+		idx = (idx + 1) & fm.mask
 	}
 }
 
@@ -111,9 +134,8 @@ func (fm *SmallMap[K, V]) Size() int {
 }
 
 func (fm *SmallMap[K, V]) ForEach(f func(key K, value V)) {
-	// Optimization: we only iterate up to the real capacity + padding
-	for i := 0; i < len(fm.metadata); i++ {
-		if fm.metadata[i]&hOccupied != 0 {
+	for i, m := range fm.metadata {
+		if m&hOccupied != 0 {
 			f(fm.keys[i], fm.values[i])
 		}
 	}
@@ -121,8 +143,8 @@ func (fm *SmallMap[K, V]) ForEach(f func(key K, value V)) {
 
 func (fm *SmallMap[K, V]) Keys() []K {
 	res := make([]K, 0, fm.size)
-	for i := 0; i < len(fm.metadata); i++ {
-		if fm.metadata[i]&hOccupied != 0 {
+	for i, m := range fm.metadata {
+		if m&hOccupied != 0 {
 			res = append(res, fm.keys[i])
 		}
 	}
@@ -131,8 +153,8 @@ func (fm *SmallMap[K, V]) Keys() []K {
 
 func (fm *SmallMap[K, V]) Values() []V {
 	res := make([]V, 0, fm.size)
-	for i := 0; i < len(fm.metadata); i++ {
-		if fm.metadata[i]&hOccupied != 0 {
+	for i, m := range fm.metadata {
+		if m&hOccupied != 0 {
 			res = append(res, fm.values[i])
 		}
 	}
