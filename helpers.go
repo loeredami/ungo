@@ -294,6 +294,19 @@ func ForEach[T any](s []T, fn func(T)) {
 	}
 }
 
+func ForEachGo[T any](s []T, fn func(T)) {
+	ch := make(chan T, len(s))
+	go func() {
+		for v := range ch {
+			fn(v)
+		}
+	}()
+	for _, v := range s {
+		ch <- v
+	}
+	close(ch)
+}
+
 func WithValve[T, R any](limit int, fn func(T) R) func(T) R {
 	sem := make(chan struct{}, limit)
 	return func(arg T) R {
