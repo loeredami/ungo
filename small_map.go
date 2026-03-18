@@ -1,178 +1,98 @@
 package ungo
 
-import (
-	"unsafe"
-)
-
-const (
-	hEmpty    uint8 = 0
-	hDeleted  uint8 = 1 // Tombstone marker
-	hOccupied uint8 = 1 << 7
-)
+type entry[K comparable, V any] struct {
+	key   K
+	value V
+}
 
 type SmallMap[K comparable, V any] struct {
-	keys     []K
-	values   []V
-	metadata []uint8
-	size     int
-	mask     uintptr
+	data []entry[K, V]
 }
 
 func NewSmallMap[K comparable, V any](capacity int) *SmallMap[K, V] {
-	realCap := 1
-	for realCap < capacity {
-		realCap <<= 1
-	}
-
 	return &SmallMap[K, V]{
-		keys:     make([]K, realCap),
-		values:   make([]V, realCap),
-		metadata: make([]uint8, realCap),
-		mask:     uintptr(realCap - 1),
+		data: make([]entry[K, V], 0, capacity),
 	}
-}
-
-func (fm *SmallMap[K, V]) fastHash(key K) uintptr {
-	ptr := unsafe.Pointer(&key)
-	size := unsafe.Sizeof(key)
-
-	if size == 8 {
-		u := *(*uint64)(ptr)
-		u ^= u >> 33
-		u *= 0xff51afd7ed558ccd
-		u ^= u >> 33
-		return uintptr(u)
-	}
-
-	h := uint64(14695981039346656037)
-	b := unsafe.Slice((*byte)(ptr), size)
-	for _, x := range b {
-		h ^= uint64(x)
-		h *= 1099511628211
-	}
-	return uintptr(h)
 }
 
 func (fm *SmallMap[K, V]) Set(key K, value V) {
-	h := fm.fastHash(key)
-	idx := h & fm.mask
-	tag := uint8(h&0x7F) | hOccupied
-
-	// We track the first deleted slot we find to reuse it
-	insertIdx := uintptr(0)
-	foundDeleted := false
-
-	for {
-		m := fm.metadata[idx]
-		if m == hEmpty {
-			// If we passed a tombstone, use that instead to keep the chain short
-			if foundDeleted {
-				idx = insertIdx
-			}
-			fm.keys[idx] = key
-			fm.values[idx] = value
-			fm.metadata[idx] = tag
-			fm.size++
+	d := fm.data
+	for i := 0; i < len(d); i++ {
+		if d[i].key == key {
+			d[i].value = value
 			return
 		}
-		if m == hDeleted && !foundDeleted {
-			insertIdx = idx
-			foundDeleted = true
-		}
-		if m == tag && fm.keys[idx] == key {
-			fm.values[idx] = value
-			return
-		}
-		idx = (idx + 1) & fm.mask
 	}
+	fm.data = append(fm.data, entry[K, V]{key: key, value: value})
 }
 
 func (fm *SmallMap[K, V]) Get(key K) (V, bool) {
-	h := fm.fastHash(key)
-	idx := h & fm.mask
-	tag := uint8(h&0x7F) | hOccupied
-
-	for {
-		m := fm.metadata[idx]
-		if m == hEmpty {
-			var zero V
-			return zero, false
+	d := fm.data
+	for i := 0; i < len(d); i++ {
+		if d[i].key == key {
+			return d[i].value, true
 		}
-		// hDeleted (Tombstone) is ignored; we keep probing
-		if m == tag && fm.keys[idx] == key {
-			return fm.values[idx], true
-		}
-		idx = (idx + 1) & fm.mask
 	}
+	var zero V
+	return zero, false
 }
 
 func (fm *SmallMap[K, V]) Delete(key K) {
-	h := fm.fastHash(key)
-	idx := h & fm.mask
-	tag := uint8(h&0x7F) | hOccupied
+	d := fm.data
+	for i := 0; i < len(d); i++ {
+		if d[i].key == key {
+			lastIdx := len(d) - 1
+			d[i] = d[lastIdx]
 
-	for {
-		m := fm.metadata[idx]
-		if m == hEmpty {
+			var zero entry[K, V]
+			d[lastIdx] = zero
+
+			fm.data = d[:lastIdx]
 			return
 		}
-		if m == tag && fm.keys[idx] == key {
-			fm.metadata[idx] = hDeleted // Mark as tombstone
-			var zeroK K
-			var zeroV V
-			fm.keys[idx] = zeroK
-			fm.values[idx] = zeroV
-			fm.size--
-			return
-		}
-		idx = (idx + 1) & fm.mask
 	}
 }
 
 func (fm *SmallMap[K, V]) Size() int {
-	return fm.size
+	return len(fm.data)
 }
 
 func (fm *SmallMap[K, V]) ForEach(f func(key K, value V)) {
-	for i, m := range fm.metadata {
-		if m&hOccupied != 0 {
-			f(fm.keys[i], fm.values[i])
-		}
+	for i := 0; i < len(fm.data); i++ {
+		f(fm.data[i].key, fm.data[i].value)
 	}
 }
 
 func (fm *SmallMap[K, V]) Keys() []K {
-	res := make([]K, 0, fm.size)
-	for i, m := range fm.metadata {
-		if m&hOccupied != 0 {
-			res = append(res, fm.keys[i])
-		}
+	res := make([]K, len(fm.data))
+	for i := 0; i < len(fm.data); i++ {
+		res[i] = fm.data[i].key
 	}
 	return res
 }
 
 func (fm *SmallMap[K, V]) Values() []V {
-	res := make([]V, 0, fm.size)
-	for i, m := range fm.metadata {
-		if m&hOccupied != 0 {
-			res = append(res, fm.values[i])
-		}
+	res := make([]V, len(fm.data))
+	for i := 0; i < len(fm.data); i++ {
+		res[i] = fm.data[i].value
 	}
 	return res
 }
 
 func (fm *SmallMap[K, V]) Clear() {
-	var zeroK K
-	var zeroV V
-	for i := range fm.metadata {
-		fm.metadata[i] = hEmpty
-		fm.keys[i] = zeroK
-		fm.values[i] = zeroV
+	var zero entry[K, V]
+	for i := range fm.data {
+		fm.data[i] = zero
 	}
-	fm.size = 0
+	fm.data = fm.data[:0]
 }
 
 func (fm *SmallMap[K, V]) Contains(key K) bool {
-	_, found := fm.Get(key)
-	return found
+	d := fm.data
+	for i := 0; i < len(d); i++ {
+		if d[i].key == key {
+			return true
+		}
+	}
+	return false
 }
