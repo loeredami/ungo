@@ -1,6 +1,9 @@
 package ungo
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 // Builds on a weird thought experiment, read more in unusual_num.md
 type UnusualNum struct {
@@ -9,6 +12,21 @@ type UnusualNum struct {
 
 func NewUnusualNum() *UnusualNum {
 	return &UnusualNum{v: Set[complex128]{}}
+}
+
+func (u *UnusualNum) String() string {
+	if u.v.Size() == 0 {
+		return "0"
+	}
+	if u.v.Size() == 1 {
+		return fmt.Sprintf("%v", u.v.ToSlice()[0])
+	}
+	result := "{"
+	for _, ni := range u.v.ToSlice() {
+		result += fmt.Sprintf("%v ", ni)
+	}
+	result = result[:len(result)-1] + "}"
+	return result
 }
 
 func (u *UnusualNum) AddPossibility(ni complex128) {

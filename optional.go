@@ -1,8 +1,17 @@
 package ungo
 
+import "fmt"
+
 type Optional[T any] struct {
 	value T
 	valid bool
+}
+
+func (o Optional[T]) String() string {
+	if !o.valid {
+		return "Optional(empty)"
+	}
+	return fmt.Sprintf("Optional(%v)", o.value)
 }
 
 func (o Optional[T]) HasValue() bool {

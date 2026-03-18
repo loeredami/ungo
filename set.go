@@ -1,5 +1,7 @@
 package ungo
 
+import "fmt"
+
 type Set[T comparable] FastMap[T, struct{}]
 
 func NewSet[T comparable](elements ...T) Set[T] {
@@ -8,6 +10,10 @@ func NewSet[T comparable](elements ...T) Set[T] {
 		s.Add(elem)
 	}
 	return s
+}
+
+func (s *Set[T]) String() string {
+	return fmt.Sprintf("Set(%v)", s.ToSlice())
 }
 
 func (s *Set[T]) Add(element T) {

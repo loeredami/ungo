@@ -1,12 +1,17 @@
 package ungo
 
+import "fmt"
+
 type Result[T any] struct {
 	value T
 	err   error
 }
 
-func (e Result[T]) Success() bool {
-	return e.err == nil
+func (e Result[T]) String() string {
+	if e.err != nil {
+		return fmt.Sprintf("Result(Err: %v)", e.err)
+	}
+	return fmt.Sprintf("Result(Ok: %v)", e.value)
 }
 
 func (e Result[T]) Value() T {

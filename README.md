@@ -1,9 +1,12 @@
 # ungo
-Ungo provides common types and utililities, some of which in my opinion should be built into go's std.
-
-I am too lazy to write examples. So please create a pull request with examples if you want to share your own.
+Go prides itself on what it lacks. ungo provides what it needs. It is a collection of common types and utilities that prioritize developer utility over the strict minimalist philosophy of the standard library.
 
 # install
 ```bash
 go get github.com/loeredami/ungo
+```
+
+# update
+```bash
+GOPROXY=direct go get -u github.com/loeredami/ungo
 ```

@@ -1,11 +1,17 @@
 package ungo
 
+import "fmt"
+
 type Stack[T any] struct {
 	elements []T
 }
 
 func NewStack[T any]() *Stack[T] {
 	return &Stack[T]{}
+}
+
+func (s *Stack[T]) String() string {
+	return fmt.Sprintf("Stack(%v)", s.elements)
 }
 
 func (s *Stack[T]) Push(value T) {

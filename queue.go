@@ -1,11 +1,17 @@
 package ungo
 
+import "fmt"
+
 type Queue[T any] struct {
 	elements []T
 }
 
 func NewQueue[T any]() *Queue[T] {
 	return &Queue[T]{elements: []T{}}
+}
+
+func (q *Queue[T]) String() string {
+	return fmt.Sprintf("Queue(%v)", q.elements)
 }
 
 func (q *Queue[T]) Push(element T) {

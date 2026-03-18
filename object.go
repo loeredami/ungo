@@ -1,6 +1,9 @@
 package ungo
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type Object struct {
 	Data      FastMap[string, any]
@@ -14,6 +17,23 @@ func NewObject() *Object {
 		Methods:   FastMap[string, func(*Object, ...any) Result[any]]{},
 		Prototype: nil,
 	}
+}
+
+func (o *Object) String() string {
+	result := "{\n"
+	for _, key := range o.Data.Keys() {
+		value, _ := o.Data.Get(key)
+		result += fmt.Sprintf("  %s: %v,\n", key, value)
+	}
+	for _, method := range o.Methods.Keys() {
+		result += fmt.Sprintf("  %s: func,\n", method)
+	}
+	proto_type_lines := If(o.Prototype != nil, o.Prototype.String(), "")
+	for _, line := range strings.Split(proto_type_lines, "\n") {
+		result += fmt.Sprintf("  %s\n", line)
+	}
+	result += "}"
+	return result
 }
 
 func (o *Object) Get(key string) Result[any] {

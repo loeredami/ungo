@@ -1,6 +1,9 @@
 package ungo
 
-import "slices"
+import (
+	"fmt"
+	"slices"
+)
 
 type Tuple struct {
 	elements []any
@@ -8,6 +11,22 @@ type Tuple struct {
 
 func NewTuple(elements ...any) *Tuple {
 	return &Tuple{elements: elements}
+}
+
+func (t *Tuple) ToSlice() []any {
+	return t.elements
+}
+
+func (t *Tuple) String() string {
+	result := "("
+	for i, element := range t.elements {
+		if i > 0 {
+			result += ", "
+		}
+		result += fmt.Sprintf("%v", element)
+	}
+	result += ")"
+	return result
 }
 
 func (t *Tuple) Get(index int) any {

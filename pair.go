@@ -1,5 +1,7 @@
 package ungo
 
+import "fmt"
+
 type Pair[T1, T2 any] struct {
 	first  T1
 	second T2
@@ -7,6 +9,10 @@ type Pair[T1, T2 any] struct {
 
 func NewPair[T1, T2 any](first T1, second T2) *Pair[T1, T2] {
 	return &Pair[T1, T2]{first: first, second: second}
+}
+
+func (p *Pair[T1, T2]) String() string {
+	return fmt.Sprintf("(%v, %v)", p.first, p.second)
 }
 
 func (p *Pair[T1, T2]) First() T1 {
