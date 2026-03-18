@@ -9,8 +9,6 @@ const (
 	hOccupied uint8 = 1 << 7
 )
 
-// SmallMap is a map implementation optimized for small sets of key-value pairs.
-// It uses a simple hash table with linear probing and a fast hash function, slightly slower than normal maps, unless you start going in the 10 millions.
 type SmallMap[K comparable, V any] struct {
 	keys     []K
 	values   []V
@@ -19,18 +17,19 @@ type SmallMap[K comparable, V any] struct {
 	mask     uintptr
 }
 
-// NewSmallMap creates a new SmallMap with the given capacity.
-// The actual capacity will be rounded up to the nearest power of 2.
 func NewSmallMap[K comparable, V any](capacity int) *SmallMap[K, V] {
 	realCap := 1
 	for realCap < capacity {
 		realCap <<= 1
 	}
 
+	// We allocate a bit of extra padding at the end.
+	// This prevents "wrap-around" logic inside the hot loops.
+	padding := 8
 	return &SmallMap[K, V]{
-		keys:     make([]K, realCap),
-		values:   make([]V, realCap),
-		metadata: make([]uint8, realCap),
+		keys:     make([]K, realCap+padding),
+		values:   make([]V, realCap+padding),
+		metadata: make([]uint8, realCap+padding),
 		mask:     uintptr(realCap - 1),
 	}
 }
@@ -61,6 +60,7 @@ func (fm *SmallMap[K, V]) Set(key K, value V) {
 	idx := h & fm.mask
 	tag := uint8(h&0x7F) | hOccupied
 
+	// Optimized loop: minimal branching
 	for {
 		m := fm.metadata[idx]
 		if m == hEmpty {
@@ -74,7 +74,13 @@ func (fm *SmallMap[K, V]) Set(key K, value V) {
 			fm.values[idx] = value
 			return
 		}
-		idx = (idx + 1) & fm.mask
+
+		idx++
+		// If we hit the absolute end of the allocated slice,
+		// then and only then do we wrap back to 0.
+		if idx >= uintptr(len(fm.metadata)) {
+			idx = 0
+		}
 	}
 }
 
@@ -92,52 +98,11 @@ func (fm *SmallMap[K, V]) Get(key K) (V, bool) {
 		if m == tag && fm.keys[idx] == key {
 			return fm.values[idx], true
 		}
-		idx = (idx + 1) & fm.mask
-	}
-}
 
-func (fm *SmallMap[K, V]) Delete(key K) {
-	h := fm.fastHash(key)
-	idx := h & fm.mask
-	tag := uint8(h&0x7F) | hOccupied
-
-	for {
-		m := fm.metadata[idx]
-		if m == hEmpty {
-			return
+		idx++
+		if idx >= uintptr(len(fm.metadata)) {
+			idx = 0
 		}
-		if m == tag && fm.keys[idx] == key {
-			fm.metadata[idx] = hEmpty
-			var zeroK K
-			var zeroV V
-			fm.keys[idx] = zeroK
-			fm.values[idx] = zeroV
-			fm.size--
-			fm.rehashCluster(uint64(idx))
-			return
-		}
-		idx = (idx + 1) & fm.mask
-	}
-}
-
-func (fm *SmallMap[K, V]) rehashCluster(hole uint64) {
-	i := hole
-	for {
-		i = (i + 1) & uint64(fm.mask)
-		if fm.metadata[i] == hEmpty {
-			return
-		}
-
-		k, v := fm.keys[i], fm.values[i]
-		fm.metadata[i] = hEmpty
-
-		var zeroK K
-		var zeroV V
-		fm.keys[i] = zeroK
-		fm.values[i] = zeroV
-
-		fm.size--
-		fm.Set(k, v)
 	}
 }
 
@@ -146,8 +111,9 @@ func (fm *SmallMap[K, V]) Size() int {
 }
 
 func (fm *SmallMap[K, V]) ForEach(f func(key K, value V)) {
-	for i, m := range fm.metadata {
-		if m&hOccupied != 0 {
+	// Optimization: we only iterate up to the real capacity + padding
+	for i := 0; i < len(fm.metadata); i++ {
+		if fm.metadata[i]&hOccupied != 0 {
 			f(fm.keys[i], fm.values[i])
 		}
 	}
@@ -155,8 +121,8 @@ func (fm *SmallMap[K, V]) ForEach(f func(key K, value V)) {
 
 func (fm *SmallMap[K, V]) Keys() []K {
 	res := make([]K, 0, fm.size)
-	for i, m := range fm.metadata {
-		if m&hOccupied != 0 {
+	for i := 0; i < len(fm.metadata); i++ {
+		if fm.metadata[i]&hOccupied != 0 {
 			res = append(res, fm.keys[i])
 		}
 	}
@@ -165,8 +131,8 @@ func (fm *SmallMap[K, V]) Keys() []K {
 
 func (fm *SmallMap[K, V]) Values() []V {
 	res := make([]V, 0, fm.size)
-	for i, m := range fm.metadata {
-		if m&hOccupied != 0 {
+	for i := 0; i < len(fm.metadata); i++ {
+		if fm.metadata[i]&hOccupied != 0 {
 			res = append(res, fm.values[i])
 		}
 	}
