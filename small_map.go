@@ -18,7 +18,7 @@ type SmallMap[K comparable, V any] struct {
 	seed    maphash.Seed
 }
 
-func NewFastMap[K comparable, V any](capacity int) *SmallMap[K, V] {
+func NewSmallMap[K comparable, V any](capacity int) *SmallMap[K, V] {
 	realCap := 1
 	for realCap < capacity {
 		realCap <<= 1
@@ -98,7 +98,6 @@ func (fm *SmallMap[K, V]) rehashCluster(hole uint64) {
 		if !fm.buckets[i].occupied {
 			return
 		}
-		// Re-insert this element
 		k, v := fm.buckets[i].key, fm.buckets[i].value
 		fm.buckets[i].occupied = false
 		fm.size--
@@ -141,7 +140,6 @@ func (fm *SmallMap[K, V]) Values() []V {
 func (fm *SmallMap[K, V]) Clear() {
 	for i := range fm.buckets {
 		fm.buckets[i].occupied = false
-		// Clear values to help GC
 		var zeroK K
 		var zeroV V
 		fm.buckets[i].key = zeroK

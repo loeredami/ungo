@@ -7,7 +7,7 @@ import (
 
 func PackResources(file_paths []string, output_path string) {
 	WithTempFile(func(temp *os.File) {
-		table := SmallMap[string, []byte]{}
+		table := NewSmallMap[string, []byte](len(file_paths))
 		for _, path := range file_paths {
 			data, err := os.ReadFile(path)
 			if err != nil {
@@ -38,7 +38,7 @@ func PackResources(file_paths []string, output_path string) {
 }
 
 type Package struct {
-	Files SmallMap[string, []byte]
+	Files *SmallMap[string, []byte]
 }
 
 func LoadPackage(path string) (*Package, error) {
@@ -47,7 +47,7 @@ func LoadPackage(path string) (*Package, error) {
 		return nil, err
 	}
 
-	pkg := &Package{Files: SmallMap[string, []byte]{}}
+	pkg := &Package{Files: NewSmallMap[string, []byte](len(data))}
 	header, contents := func() ([][]byte, [][]byte) {
 		var headers [][]byte
 		var contents [][]byte

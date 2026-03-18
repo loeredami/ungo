@@ -5,7 +5,7 @@ import "fmt"
 type Set[T comparable] SmallMap[T, struct{}]
 
 func NewSet[T comparable](elements ...T) Set[T] {
-	s := Set[T]{}
+	s := Set[T](*NewSmallMap[T, struct{}](0xFFFFFFFFFFFF))
 	for _, elem := range elements {
 		s.Add(elem)
 	}
@@ -41,7 +41,7 @@ func (s *Set[T]) ToSlice() []T {
 }
 
 func SetFromSlice[T comparable](slice []T) Set[T] {
-	s := Set[T]{}
+	s := Set[T](*NewSmallMap[T, struct{}](len(slice)))
 	for _, elem := range slice {
 		s.Add(elem)
 	}

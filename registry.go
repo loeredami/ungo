@@ -2,8 +2,9 @@ package ungo
 
 type Registry[T any] SmallMap[string, Lazy[T]]
 
-func NewRegistry[T any]() *Registry[T] {
-	return &Registry[T]{}
+func NewRegistry[T any](capacity int) *Registry[T] {
+	r := Registry[T](*NewSmallMap[string, Lazy[T]](capacity))
+	return &r
 }
 
 func (r *Registry[T]) Register(name string, value Lazy[T]) {

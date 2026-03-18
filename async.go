@@ -14,7 +14,7 @@ type Event struct {
 type EventLoop struct {
 	events          chan Event
 	stop            chan struct{}
-	handlers        SmallMap[int, func(any) error]
+	handlers        *SmallMap[int, func(any) error]
 	handleUnhandled func(Event)
 	running         uint32
 }
@@ -23,7 +23,7 @@ func NewEventLoop() *EventLoop {
 	return &EventLoop{
 		events:          make(chan Event),
 		stop:            make(chan struct{}),
-		handlers:        SmallMap[int, func(any) error]{},
+		handlers:        NewSmallMap[int, func(any) error](1_000_000),
 		handleUnhandled: func(ev Event) {},
 		running:         0,
 	}

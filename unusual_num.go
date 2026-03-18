@@ -15,7 +15,7 @@ type UnusualNum struct {
 }
 
 func NewUnusualNum() *UnusualNum {
-	return &UnusualNum{v: Set[complex128]{}}
+	return &UnusualNum{v: NewSet[complex128](0xFFFFFFFFFFFF)}
 }
 
 func (u *UnusualNum) ForceFirst() complex128 {
@@ -471,7 +471,7 @@ func (u *UnusualNum) Hull() (min, max complex128) {
 // Quantize rounds all possibilities to the nearest multiple of 'step'.
 // This effectively collapses similar realities into a single point.
 func (u *UnusualNum) Quantize(step float64) {
-	newSet := Set[complex128]{}
+	newSet := NewSet[complex128]()
 	for _, val := range u.v.ToSlice() {
 		r := math.Round(real(val)/step) * step
 		i := math.Round(imag(val)/step) * step
