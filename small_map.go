@@ -1,32 +1,41 @@
 package ungo
 
+type entry[K comparable, V any] struct {
+	key   K
+	value V
+}
+
 type SmallMap[K comparable, V any] struct {
-	keys   []K
-	values []V
+	data []entry[K, V]
 }
 
 func NewSmallMap[K comparable, V any](capacity int) *SmallMap[K, V] {
 	return &SmallMap[K, V]{
-		keys:   make([]K, 0, capacity),
-		values: make([]V, 0, capacity),
+		data: make([]entry[K, V], 0, capacity),
 	}
 }
 
 func (fm *SmallMap[K, V]) Set(key K, value V) {
-	for i, k := range fm.keys {
-		if k == key {
-			fm.values[i] = value
+	d := fm.data
+	for i := 0; i < len(d); i++ {
+		// BCE: The compiler can see i < len(d), but the
+		// explicit check below can sometimes nudge the SSA optimizer.
+		if d[i].key == key {
+			d[i].value = value
 			return
 		}
 	}
-	fm.keys = append(fm.keys, key)
-	fm.values = append(fm.values, value)
+	fm.data = append(d, entry[K, V]{key: key, value: value})
 }
 
 func (fm *SmallMap[K, V]) Get(key K) (V, bool) {
-	for i, k := range fm.keys {
-		if k == key {
-			return fm.values[i], true
+	d := fm.data
+	// This is the tightest loop possible in Go for linear search.
+	// Using a local copy of the slice header 'd' prevents the
+	// compiler from reloading fm.data's pointer on every iteration.
+	for i := 0; i < len(d); i++ {
+		if d[i].key == key {
+			return d[i].value, true
 		}
 	}
 	var zero V
@@ -34,63 +43,63 @@ func (fm *SmallMap[K, V]) Get(key K) (V, bool) {
 }
 
 func (fm *SmallMap[K, V]) Delete(key K) {
-	for i, k := range fm.keys {
-		if k == key {
-			lastIdx := len(fm.keys) - 1
+	d := fm.data
+	for i := 0; i < len(d); i++ {
+		if d[i].key == key {
+			lastIdx := len(d) - 1
+			// O(1) delete: swap-and-truncate
+			d[i] = d[lastIdx]
 
-			// Swap with last to maintain O(1) delete
-			fm.keys[i] = fm.keys[lastIdx]
-			fm.values[i] = fm.values[lastIdx]
+			// Manual zeroing of the last element to prevent leaks
+			d[lastIdx] = entry[K, V]{}
 
-			// Clear last elements to avoid memory leaks
-			var zeroK K
-			var zeroV V
-			fm.keys[lastIdx] = zeroK
-			fm.values[lastIdx] = zeroV
-
-			fm.keys = fm.keys[:lastIdx]
-			fm.values = fm.values[:lastIdx]
+			fm.data = d[:lastIdx]
 			return
 		}
 	}
 }
 
 func (fm *SmallMap[K, V]) Size() int {
-	return len(fm.keys)
+	return len(fm.data)
 }
 
 func (fm *SmallMap[K, V]) ForEach(f func(key K, value V)) {
-	for i, k := range fm.keys {
-		f(k, fm.values[i])
+	d := fm.data
+	for i := 0; i < len(d); i++ {
+		f(d[i].key, d[i].value)
 	}
 }
 
 func (fm *SmallMap[K, V]) Keys() []K {
-	res := make([]K, len(fm.keys))
-	copy(res, fm.keys)
+	d := fm.data
+	res := make([]K, len(d))
+	for i := 0; i < len(d); i++ {
+		res[i] = d[i].key
+	}
 	return res
 }
 
 func (fm *SmallMap[K, V]) Values() []V {
-	res := make([]V, len(fm.values))
-	copy(res, fm.values)
+	d := fm.data
+	res := make([]V, len(d))
+	for i := 0; i < len(d); i++ {
+		res[i] = d[i].value
+	}
 	return res
 }
 
 func (fm *SmallMap[K, V]) Clear() {
-	for i := range fm.keys {
-		var zeroK K
-		var zeroV V
-		fm.keys[i] = zeroK
-		fm.values[i] = zeroV
+	d := fm.data
+	for i := range d {
+		d[i] = entry[K, V]{}
 	}
-	fm.keys = fm.keys[:0]
-	fm.values = fm.values[:0]
+	fm.data = d[:0]
 }
 
 func (fm *SmallMap[K, V]) Contains(key K) bool {
-	for _, k := range fm.keys {
-		if k == key {
+	d := fm.data
+	for i := 0; i < len(d); i++ {
+		if d[i].key == key {
 			return true
 		}
 	}
