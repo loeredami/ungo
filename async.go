@@ -111,6 +111,7 @@ func (el *EventLoop) PostAndWait(ev Event) any {
 	el.Post(ev)
 	return <-reply
 }
+
 func (el *EventLoop) Run() {
 	ticker := time.NewTicker(time.Millisecond * 1) // Your "Resolution"
 	defer ticker.Stop()
@@ -124,5 +125,32 @@ func (el *EventLoop) Run() {
 		case <-ticker.C:
 			el.Post(Event{Type: 0})
 		}
+	}
+}
+
+func (el *EventLoop) PostAndGet(ev Event) Optional[any] {
+	reply := make(chan any, 1)
+	ev.ReplyTo = MakeOptional(reply)
+	el.Post(ev)
+	return MakeOptional(<-reply)
+}
+
+func (el *EventLoop) PostAndGetOk(ev Event) (any, bool) {
+	reply := make(chan any, 1)
+	ev.ReplyTo = MakeOptional(reply)
+	el.Post(ev)
+	val := <-reply
+	return val, true
+}
+
+func (el *EventLoop) PostAndGetOrElse(ev Event, orElse func() any) any {
+	reply := make(chan any, 1)
+	ev.ReplyTo = MakeOptional(reply)
+	el.Post(ev)
+	select {
+	case val := <-reply:
+		return val
+	default:
+		return orElse()
 	}
 }
