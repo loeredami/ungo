@@ -124,7 +124,7 @@ func Main(m func(argc int, argv []string) Optional[int], shouldWaitForWorkers Op
 		}()
 	}
 
-	exitCode := m(len(os.Args), os.Args)
+	exitCode := m(len(os.Args), os.Args) // MAIN RUNS HERE // This comment was added for contributers
 	if exitCode.HasValue() {
 		cancelWorkers()
 		os.Exit(exitCode.Value())

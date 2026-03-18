@@ -30,6 +30,16 @@ func MakeOptional[T any](value T) Optional[T] {
 	return Optional[T]{value: value, valid: true}
 }
 
+// Alias for MakeOptional
+func Some[T any](value T) Optional[T] {
+	return MakeOptional(value)
+}
+
+// Alias for EmptyOptional
+func None[T any]() Optional[T] {
+	return EmptyOptional[T]()
+}
+
 func EmptyOptional[T any]() Optional[T] {
 	return Optional[T]{valid: false}
 }

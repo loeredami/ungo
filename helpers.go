@@ -134,36 +134,6 @@ func ReinterpretCast[Src, Dest any](src Src) Dest {
 	return dest
 }
 
-type Context[Env any] struct {
-	val       Env
-	terminate func(Env) Optional[error]
-}
-
-func NewContext[Env any]() *Context[Env] {
-	return &Context[Env]{}
-}
-
-func (v *Context[Env]) SetTerminator(terminate func(Env) Optional[error]) {
-	v.terminate = terminate
-}
-
-func (v *Context[Env]) Set(val Env) {
-	v.val = val
-}
-
-func (v *Context[Env]) Get() Env {
-	return v.val
-}
-
-func With[Env any](open func() Context[Env], action func(Env)) Optional[error] {
-	ctx := open()
-	action(ctx.Get())
-	if ctx.terminate != nil {
-		return ctx.terminate(ctx.Get())
-	}
-	return Optional[error]{valid: false}
-}
-
 func Retry[Res any](action func() (Res, error), retries int, delay time.Duration) Result[Res] {
 	var res Res
 	var err error

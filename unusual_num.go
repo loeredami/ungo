@@ -5,6 +5,10 @@ import (
 	"math"
 )
 
+type Number interface {
+	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64 | float32 | float64 | complex64 | complex128
+}
+
 // Builds on a weird thought experiment, read more in unusual_num.md
 type UnusualNum struct {
 	v Set[complex128]
@@ -31,6 +35,63 @@ func (u *UnusualNum) String() string {
 
 func (u *UnusualNum) AddPossibility(ni complex128) {
 	u.v.Add(ni)
+}
+
+func AddUnknownPossibility[T Number](u *UnusualNum, num T) {
+	switch v := any(num).(type) {
+	case int:
+		u.AddPossibility(complex(float64(v), 0))
+	case int8:
+		u.AddPossibility(complex(float64(v), 0))
+	case int16:
+		u.AddPossibility(complex(float64(v), 0))
+	case int32:
+		u.AddPossibility(complex(float64(v), 0))
+	case int64:
+		u.AddPossibility(complex(float64(v), 0))
+	case uint:
+		u.AddPossibility(complex(float64(v), 0))
+	case uint8:
+		u.AddPossibility(complex(float64(v), 0))
+	case uint16:
+		u.AddPossibility(complex(float64(v), 0))
+	case uint32:
+		u.AddPossibility(complex(float64(v), 0))
+	case uint64:
+		u.AddPossibility(complex(float64(v), 0))
+	case float32:
+		u.AddPossibility(complex(float64(v), 0))
+	case float64:
+		u.AddPossibility(complex(float64(v), 0))
+	case complex64:
+		u.AddPossibility(complex(float64(real(v)), float64(imag(v))))
+	case complex128:
+		u.AddPossibility(v)
+	}
+}
+
+func AddN[T Number](u *UnusualNum, num T) *UnusualNum {
+	other := NewUnusualNum()
+	AddUnknownPossibility[T](other, num)
+	return u.Add(other)
+}
+
+func SubtractN[T Number](u *UnusualNum, num T) *UnusualNum {
+	other := NewUnusualNum()
+	AddUnknownPossibility[T](other, num)
+	return u.Subtract(other)
+}
+
+func MultiplyN[T Number](u *UnusualNum, num T) *UnusualNum {
+	other := NewUnusualNum()
+	AddUnknownPossibility[T](other, num)
+	return u.Multiply(other)
+}
+
+func DivideN[T Number](u *UnusualNum, num T) *UnusualNum {
+	other := NewUnusualNum()
+	AddUnknownPossibility[T](other, num)
+	return u.Divide(other)
 }
 
 func (u *UnusualNum) Add(other *UnusualNum) *UnusualNum {
