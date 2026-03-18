@@ -35,10 +35,9 @@ var (
 
 func startSignalWatcher() {
 	go func() {
-		sig := <-signals.Value() // Triggers initialization
+		sig := <-signals.Value()
 		if sig != nil {
 			cancelWorkers()
-			// In a large app, you might want to log which signal was caught here
 			os.Exit(ExitSuccess)
 		}
 	}()
