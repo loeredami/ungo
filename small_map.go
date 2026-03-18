@@ -3,162 +3,175 @@ package ungo
 type entry[K comparable, V any] struct {
 	key   K
 	value V
+	used  bool
 }
 
 type SmallMap[K comparable, V any] struct {
 	data []entry[K, V]
-
-	overflow map[K]V
+	size int
+	mask uintptr
 }
 
 func NewSmallMap[K comparable, V any](capacity int) *SmallMap[K, V] {
-	return &SmallMap[K, V]{
-		data: make([]entry[K, V], 0, capacity),
+	pow2 := 16
+	for pow2 < capacity*2 {
+		pow2 <<= 1
 	}
+	return &SmallMap[K, V]{
+		data: make([]entry[K, V], pow2),
+		mask: uintptr(pow2 - 1),
+	}
+}
+
+func (fm *SmallMap[K, V]) hash(key K) uintptr {
+	var h uintptr
+	switch v := any(key).(type) {
+	case int:
+		h = uintptr(v)
+	case int64:
+		h = uintptr(v)
+	case string:
+		for i := 0; i < len(v); i++ {
+			h = h*31 + uintptr(v[i])
+		}
+	default:
+		h = uintptr(123456789)
+	}
+	h ^= h >> 16
+	h *= 0x85ebca6b
+	return h
 }
 
 func (fm *SmallMap[K, V]) Set(key K, value V) {
-	if fm.overflow != nil {
-		fm.overflow[key] = value
-		return
+	if fm.size*10 >= len(fm.data)*7 {
+		fm.grow()
 	}
 
-	d := fm.data
-	for i := 0; i < len(d); i++ {
-		if d[i].key == key {
-			d[i].value = value
+	mask := fm.mask
+	idx := fm.hash(key) & mask
+	for {
+		if !fm.data[idx].used {
+			fm.data[idx] = entry[K, V]{key: key, value: value, used: true}
+			fm.size++
 			return
 		}
-	}
-
-	if len(d) >= 24 {
-		fm.overflow = make(map[K]V, len(d)+1)
-		for i := 0; i < len(d); i++ {
-			fm.overflow[d[i].key] = d[i].value
+		if fm.data[idx].key == key {
+			fm.data[idx].value = value
+			return
 		}
-		fm.overflow[key] = value
-		fm.data = nil
-		return
+		idx = (idx + 1) & mask
 	}
-
-	fm.data = append(fm.data, entry[K, V]{key: key, value: value})
 }
 
 func (fm *SmallMap[K, V]) Get(key K) (V, bool) {
-	if fm.overflow != nil {
-		v, ok := fm.overflow[key]
-		return v, ok
+	if fm.size == 0 {
+		var zero V
+		return zero, false
 	}
 
-	d := fm.data
-	for i := 0; i < len(d); i++ {
-		if d[i].key == key {
-			return d[i].value, true
+	mask := fm.mask
+	idx := fm.hash(key) & mask
+	for {
+		e := &fm.data[idx]
+		if !e.used {
+			var zero V
+			return zero, false
 		}
+		if e.key == key {
+			return e.value, true
+		}
+		idx = (idx + 1) & mask
 	}
-
-	var zero V
-	return zero, false
 }
 
 func (fm *SmallMap[K, V]) Delete(key K) {
-	if fm.overflow != nil {
-		delete(fm.overflow, key)
-		return
-	}
-
-	d := fm.data
-	for i := 0; i < len(d); i++ {
-		if d[i].key == key {
-			lastIdx := len(d) - 1
-			d[i] = d[lastIdx]
-
-			var zero entry[K, V]
-			d[lastIdx] = zero
-
-			fm.data = d[:lastIdx]
+	mask := fm.mask
+	idx := fm.hash(key) & mask
+	for {
+		if !fm.data[idx].used {
 			return
+		}
+		if fm.data[idx].key == key {
+			fm.data[idx].used = false
+			fm.size--
+			fm.rehashChain(idx)
+			return
+		}
+		idx = (idx + 1) & mask
+	}
+}
+
+func (fm *SmallMap[K, V]) rehashChain(i uintptr) {
+	mask := fm.mask
+	j := i
+	for {
+		j = (j + 1) & mask
+		if !fm.data[j].used {
+			return
+		}
+		r := fm.hash(fm.data[j].key) & mask
+		if (j > i && (r <= i || r > j)) || (j < i && (r <= i && r > j)) {
+			fm.data[i] = fm.data[j]
+			i = j
+			fm.data[i].used = false
+		}
+	}
+}
+
+func (fm *SmallMap[K, V]) grow() {
+	oldData := fm.data
+	newCap := len(oldData) * 2
+	fm.data = make([]entry[K, V], newCap)
+	fm.mask = uintptr(newCap - 1)
+	fm.size = 0
+
+	for i := range oldData {
+		if oldData[i].used {
+			fm.Set(oldData[i].key, oldData[i].value)
 		}
 	}
 }
 
 func (fm *SmallMap[K, V]) Size() int {
-	if fm.overflow != nil {
-		return len(fm.overflow)
-	}
-	return len(fm.data)
+	return fm.size
 }
 
 func (fm *SmallMap[K, V]) ForEach(f func(key K, value V)) {
-	if fm.overflow != nil {
-		for k, v := range fm.overflow {
-			f(k, v)
+	for i := range fm.data {
+		if fm.data[i].used {
+			f(fm.data[i].key, fm.data[i].value)
 		}
-		return
-	}
-
-	d := fm.data
-	for i := 0; i < len(d); i++ {
-		f(d[i].key, d[i].value)
 	}
 }
 
 func (fm *SmallMap[K, V]) Keys() []K {
-	if fm.overflow != nil {
-		res := make([]K, 0, len(fm.overflow))
-		for k := range fm.overflow {
-			res = append(res, k)
+	res := make([]K, 0, fm.size)
+	for i := range fm.data {
+		if fm.data[i].used {
+			res = append(res, fm.data[i].key)
 		}
-		return res
-	}
-
-	res := make([]K, len(fm.data))
-	for i := 0; i < len(fm.data); i++ {
-		res[i] = fm.data[i].key
 	}
 	return res
 }
 
 func (fm *SmallMap[K, V]) Values() []V {
-	if fm.overflow != nil {
-		res := make([]V, 0, len(fm.overflow))
-		for _, v := range fm.overflow {
-			res = append(res, v)
+	res := make([]V, 0, fm.size)
+	for i := range fm.data {
+		if fm.data[i].used {
+			res = append(res, fm.data[i].value)
 		}
-		return res
-	}
-
-	res := make([]V, len(fm.data))
-	for i := 0; i < len(fm.data); i++ {
-		res[i] = fm.data[i].value
 	}
 	return res
 }
 
 func (fm *SmallMap[K, V]) Clear() {
-	if fm.overflow != nil {
-		for k := range fm.overflow {
-			delete(fm.overflow, k)
-		}
-	}
-
 	for i := range fm.data {
 		fm.data[i] = entry[K, V]{}
 	}
-	fm.data = fm.data[:0]
+	fm.size = 0
 }
 
 func (fm *SmallMap[K, V]) Contains(key K) bool {
-	if fm.overflow != nil {
-		_, ok := fm.overflow[key]
-		return ok
-	}
-
-	d := fm.data
-	for i := 0; i < len(d); i++ {
-		if d[i].key == key {
-			return true
-		}
-	}
-	return false
+	_, found := fm.Get(key)
+	return found
 }
