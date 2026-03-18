@@ -11,16 +11,14 @@ type SmallMap[K comparable, V any] struct {
 
 func NewSmallMap[K comparable, V any](capacity int) *SmallMap[K, V] {
 	return &SmallMap[K, V]{
-		// We allocate +1 for the sentinel record
-		data: make([]entry[K, V], 0, capacity+1),
+		data: make([]entry[K, V], 0, capacity),
 	}
 }
 
 func (fm *SmallMap[K, V]) Set(key K, value V) {
-	d := fm.data
-	for i := 0; i < len(d); i++ {
-		if d[i].key == key {
-			d[i].value = value
+	for i := 0; i < len(fm.data); i++ {
+		if fm.data[i].key == key {
+			fm.data[i].value = value
 			return
 		}
 	}
@@ -29,31 +27,11 @@ func (fm *SmallMap[K, V]) Set(key K, value V) {
 
 func (fm *SmallMap[K, V]) Get(key K) (V, bool) {
 	d := fm.data
-	n := len(d)
-	if n == 0 {
-		var zero V
-		return zero, false
+	for i := 0; i < len(d); i++ {
+		if d[i].key == key {
+			return d[i].value, true
+		}
 	}
-
-	lastOriginal := d[n-1]
-	if lastOriginal.key == key {
-		return lastOriginal.value, true
-	}
-
-	fm.data = fm.data[:n+1]
-	fm.data[n].key = key
-
-	i := 0
-	for fm.data[i].key != key {
-		i++
-	}
-
-	fm.data = fm.data[:n]
-
-	if i < n {
-		return d[i].value, true
-	}
-
 	var zero V
 	return zero, false
 }
@@ -66,6 +44,7 @@ func (fm *SmallMap[K, V]) Delete(key K) {
 			d[i] = d[lastIdx]
 
 			d[lastIdx] = entry[K, V]{}
+
 			fm.data = d[:lastIdx]
 			return
 		}
@@ -84,19 +63,17 @@ func (fm *SmallMap[K, V]) ForEach(f func(key K, value V)) {
 }
 
 func (fm *SmallMap[K, V]) Keys() []K {
-	d := fm.data
-	res := make([]K, len(d))
-	for i := 0; i < len(d); i++ {
-		res[i] = d[i].key
+	res := make([]K, len(fm.data))
+	for i := 0; i < len(fm.data); i++ {
+		res[i] = fm.data[i].key
 	}
 	return res
 }
 
 func (fm *SmallMap[K, V]) Values() []V {
-	d := fm.data
-	res := make([]V, len(d))
-	for i := 0; i < len(d); i++ {
-		res[i] = d[i].value
+	res := make([]V, len(fm.data))
+	for i := 0; i < len(fm.data); i++ {
+		res[i] = fm.data[i].value
 	}
 	return res
 }
@@ -109,6 +86,11 @@ func (fm *SmallMap[K, V]) Clear() {
 }
 
 func (fm *SmallMap[K, V]) Contains(key K) bool {
-	_, found := fm.Get(key)
-	return found
+	d := fm.data
+	for i := 0; i < len(d); i++ {
+		if d[i].key == key {
+			return true
+		}
+	}
+	return false
 }
