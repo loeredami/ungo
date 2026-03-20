@@ -32,7 +32,7 @@ func (ll *LinkedList[T]) Get(index int) Optional[T] {
 		return EmptyOptional[T]()
 	}
 	current := ll.head
-	for range index {
+	for i := 0; i < index; i++ {
 		current = current.next
 	}
 	return MakeOptional(current.value)
@@ -43,7 +43,7 @@ func (ll *LinkedList[T]) Set(index int, value T) {
 		return
 	}
 	current := ll.head
-	for range index {
+	for i := 0; i < index; i++ {
 		current = current.next
 	}
 	current.value = value
@@ -56,7 +56,7 @@ func (ll *LinkedList[T]) Size() int {
 func (ll *LinkedList[T]) Clear() {
 	for current := ll.head; current != nil; {
 		next := current.next
-		current.next = nil // Help GC
+		current.next = nil
 		current = next
 	}
 	ll.head = nil
@@ -92,17 +92,22 @@ func (ll *LinkedList[T]) Remove(index int) {
 	if index < 0 || index >= ll.size {
 		return
 	}
-	if ll.size == 1 {
-		ll.head = nil
-		ll.tail = nil
-		ll.size = 0
-		return
+
+	if index == 0 {
+		ll.head = ll.head.next
+		if ll.head == nil {
+			ll.tail = nil
+		}
+	} else {
+		prev := ll.head
+		for i := 0; i < index-1; i++ {
+			prev = prev.next
+		}
+		prev.next = prev.next.next
+		if prev.next == nil {
+			ll.tail = prev
+		}
 	}
-	current := ll.head
-	for range index {
-		current = current.next
-	}
-	current.next = current.next.next
 	ll.size--
 }
 
