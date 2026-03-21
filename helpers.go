@@ -97,10 +97,10 @@ func FunMap[Env, A, B any](r FunReader[Env, A], f func(A) B) FunReader[Env, B] {
 	}
 }
 
-func ApplyAll[T any](slice []T, action func(T) T) []T {
+func ApplyAll[T any](slice []T, action func(*T) T) []T {
 	result := make([]T, len(slice))
-	for i, v := range slice {
-		result[i] = action(v)
+	for i, _ := range slice {
+		result[i] = action(&slice[i])
 	}
 	return result
 }
@@ -194,8 +194,8 @@ func RlockFun[T any](fn func(T)) func(T) {
 	var mu sync.RWMutex
 
 	return func(arg T) {
-		mu.Lock()
-		defer mu.Unlock()
+		mu.RLock()
+		defer mu.RUnlock()
 
 		fn(arg)
 	}
