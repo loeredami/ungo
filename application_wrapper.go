@@ -132,7 +132,7 @@ func Main(m func(argc int, argv []string) Optional[int], shouldWaitForWorkers Op
 	if shouldWaitForWorkers.HasValue() && shouldWaitForWorkers.Value() {
 		waitForWorkers()
 	}
-	os.Exit(ExitSuccess)
+	os.Exit(exitCode.OrElse(0))
 }
 
 type SubProcessLink chan struct{}

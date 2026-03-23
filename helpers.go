@@ -377,11 +377,8 @@ func Tee[T any](input <-chan T) (<-chan T, <-chan T) {
 		defer close(out1)
 		defer close(out2)
 		for item := range input {
-			var wg sync.WaitGroup
-			wg.Add(2)
-			go func(v T) { out1 <- v; wg.Done() }(item)
-			go func(v T) { out2 <- v; wg.Done() }(item)
-			wg.Wait()
+			out1 <- item
+			out2 <- item
 		}
 	}()
 	return out1, out2

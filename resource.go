@@ -57,7 +57,6 @@ func LoadPackage(path string) (*Package, error) {
 			headers = append(headers, data[i:i+name_len])
 			i += name_len
 			contents = append(contents, data[i:])
-			break
 		}
 		return headers, contents
 	}()
