@@ -2,43 +2,64 @@ package ungo
 
 import "fmt"
 
+type stackNode[T any] struct {
+	val  T
+	last *stackNode[T]
+}
+
 type Stack[T any] struct {
-	elements []T
+	counter int
+	last    *stackNode[T]
 }
 
 func NewStack[T any]() *Stack[T] {
-	return &Stack[T]{}
+	return &Stack[T]{
+		counter: 0,
+		last:    nil,
+	}
 }
 
 func (s *Stack[T]) String() string {
-	return fmt.Sprintf("Stack(%v)", s.elements)
+	if s.last == nil {
+		return "Stack(empty)"
+	}
+	return fmt.Sprintf("Stack(last: %v)", s.last)
 }
 
 func (s *Stack[T]) Push(value T) {
-	s.elements = append(s.elements, value)
+	nLast := &stackNode[T]{
+		val:  value,
+		last: s.last,
+	}
+	s.last = nLast
+	s.counter++
 }
 
 func (s *Stack[T]) Pop() Optional[T] {
-	if len(s.elements) == 0 {
-		return EmptyOptional[T]()
+	if s.last == nil {
+		return None[T]()
 	}
-	lastIndex := len(s.elements) - 1
-	value := s.elements[lastIndex]
-	s.elements = s.elements[:lastIndex]
-	return MakeOptional(value)
+
+	value := s.last.val
+	s.last = s.last.last
+	s.counter--
+
+	return Some(value)
 }
 
 func (s *Stack[T]) Peek() Optional[T] {
-	if len(s.elements) == 0 {
-		return EmptyOptional[T]()
+	if s.last == nil {
+		return None[T]()
 	}
-	return MakeOptional(s.elements[len(s.elements)-1])
+
+	return Some(s.last.val)
 }
 
 func (s *Stack[T]) Size() int {
-	return len(s.elements)
+	return s.counter
 }
 
 func (s *Stack[T]) Clear() {
-	s.elements = make([]T, 0)
+	for s.Pop().HasValue() {
+	}
 }

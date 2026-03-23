@@ -2,38 +2,76 @@ package ungo
 
 import "fmt"
 
+type queueNode[T any] struct {
+	val  T
+	next *queueNode[T]
+}
+
 type Queue[T any] struct {
-	elements []T
+	counter int
+	current *queueNode[T]
+	last    *queueNode[T]
 }
 
 func NewQueue[T any]() *Queue[T] {
-	return &Queue[T]{elements: []T{}}
+	return &Queue[T]{
+		counter: 0,
+		current: nil,
+		last:    nil,
+	}
 }
 
 func (q *Queue[T]) String() string {
-	return fmt.Sprintf("Queue(%v)", q.elements)
+	if q.current == nil {
+		return "Queue(Empty)"
+	}
+	return fmt.Sprintf("Queue(%v)", q.current.val)
 }
 
 func (q *Queue[T]) Push(element T) {
-	q.elements = append(q.elements, element)
+	if q.current == nil {
+		q.current = &queueNode[T]{
+			val:  element,
+			next: nil,
+		}
+		q.last = q.current
+		q.counter++
+		return
+	}
+
+	node := &queueNode[T]{
+		val:  element,
+		next: nil,
+	}
+	q.last.next = node
+	q.last = node
+	q.counter++
 }
 
 func (q *Queue[T]) Pop() Optional[T] {
-	if len(q.elements) == 0 {
-		return EmptyOptional[T]()
+	if q.current == nil {
+		return None[T]()
 	}
-	element := q.elements[0]
-	q.elements = q.elements[1:]
-	return MakeOptional(element)
+
+	val := q.current.val
+
+	q.current = q.current.next
+	if q.current == nil {
+		q.last = nil
+	}
+
+	q.counter--
+
+	return Some(val)
 }
 
 func (q *Queue[T]) Peek() Optional[T] {
-	if len(q.elements) == 0 {
-		return EmptyOptional[T]()
+	if q.current == nil {
+		return None[T]()
 	}
-	return MakeOptional(q.elements[0])
+	return Some(q.current.val)
 }
 
 func (q *Queue[T]) IsEmpty() bool {
-	return len(q.elements) == 0
+	return q.current == nil
 }
