@@ -10,7 +10,7 @@ func TestPackedEncoding_FullCycle(t *testing.T) {
 	filename := "test_compact.bin"
 	defer os.Remove(filename)
 
-	pe := New()
+	pe := NewPackedEncoding()
 
 	typeID4Bit := uint16(1)
 	typeID12Bit := uint16(2)
@@ -43,7 +43,7 @@ func TestPackedEncoding_FullCycle(t *testing.T) {
 		t.Fatalf("Failed to write to file: %v", err)
 	}
 
-	pe2 := New()
+	pe2 := NewPackedEncoding()
 	if err := pe2.ReadFromFile(filename); err != nil {
 		t.Fatalf("Failed to read from file: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestPackedEncoding_FullCycle(t *testing.T) {
 }
 
 func TestPackedEncoding_OverlappingAlignment(t *testing.T) {
-	pe := New()
+	pe := NewPackedEncoding()
 	type3Bit := uint16(1)
 	pe.RegisterType(type3Bit, 3)
 

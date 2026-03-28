@@ -10,8 +10,6 @@ import (
 	"unsafe"
 )
 
-var NULL_ANY = EmptyOptional[any]()
-
 func If[T any](condition bool, trueValue T, falseValue T) T {
 	if condition {
 		return trueValue

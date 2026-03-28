@@ -7,6 +7,9 @@ type Optional[T any] struct {
 	valid bool
 }
 
+var NULLPTR = None[uintptr]()
+var NULL = None[uint]()
+
 func (o Optional[T]) String() string {
 	if !o.valid {
 		return "Optional(empty)"

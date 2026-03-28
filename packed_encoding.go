@@ -24,7 +24,7 @@ type PackedEncoding struct {
 	Data   []byte
 }
 
-func New() *PackedEncoding {
+func NewPackedEncoding() *PackedEncoding {
 	return &PackedEncoding{
 		Types: make(map[uint16]PackedType),
 	}
