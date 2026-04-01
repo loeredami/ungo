@@ -6,15 +6,15 @@ import (
 )
 
 type Object struct {
-	Data      SmallMap[string, any]
-	Methods   SmallMap[string, func(*Object, ...any) Result[any]]
+	Data      *SmallMap[string, any]
+	Methods   *SmallMap[string, func(*Object, ...any) Result[any]]
 	Prototype *Object
 }
 
 func NewObject() *Object {
 	return &Object{
-		Data:      SmallMap[string, any]{},
-		Methods:   SmallMap[string, func(*Object, ...any) Result[any]]{},
+		Data:      NewSmallMap[string, any](1024),
+		Methods:   NewSmallMap[string, func(*Object, ...any) Result[any]](1024),
 		Prototype: nil,
 	}
 }
@@ -87,9 +87,7 @@ func (o *Object) Has(key string) bool {
 }
 
 func FromPrototype(prototype *Object) *Object {
-	return &Object{
-		Data:      SmallMap[string, any]{},
-		Methods:   SmallMap[string, func(*Object, ...any) Result[any]]{},
-		Prototype: prototype,
-	}
+	obj := NewObject()
+	obj.Prototype = prototype
+	return obj
 }
