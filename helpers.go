@@ -97,7 +97,7 @@ func FunMap[Env, A, B any](r FunReader[Env, A], f func(A) B) FunReader[Env, B] {
 
 func ApplyAll[T any](slice []T, action func(*T) T) []T {
 	result := make([]T, len(slice))
-	for i, _ := range slice {
+	for i := range slice {
 		result[i] = action(&slice[i])
 	}
 	return result

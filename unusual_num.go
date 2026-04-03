@@ -6,16 +6,16 @@ import (
 )
 
 type Number interface {
-	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64 | float32 | float64 | complex64 | complex128
+	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~float32 | ~float64 | ~complex64 | ~complex128
 }
 
-// Builds on a weird thought experiment, read more in unusual_num.md
+// Builds on a weird thought experiment, read more in `unusual_num.md`
 type UnusualNum struct {
 	v Set[complex128]
 }
 
 func NewUnusualNum() *UnusualNum {
-	return &UnusualNum{v: NewSet[complex128](0xFFFFFFFFFFFF)}
+	return &UnusualNum{v: NewSet[complex128](0xFFFF)}
 }
 
 func (u *UnusualNum) ForceFirst() complex128 {
@@ -114,25 +114,25 @@ func AddUnknownPossibility[T Number](u *UnusualNum, num T) {
 
 func AddN[T Number](u *UnusualNum, num T) *UnusualNum {
 	other := NewUnusualNum()
-	AddUnknownPossibility[T](other, num)
+	AddUnknownPossibility(other, num)
 	return u.Add(other)
 }
 
 func SubtractN[T Number](u *UnusualNum, num T) *UnusualNum {
 	other := NewUnusualNum()
-	AddUnknownPossibility[T](other, num)
+	AddUnknownPossibility(other, num)
 	return u.Subtract(other)
 }
 
 func MultiplyN[T Number](u *UnusualNum, num T) *UnusualNum {
 	other := NewUnusualNum()
-	AddUnknownPossibility[T](other, num)
+	AddUnknownPossibility(other, num)
 	return u.Multiply(other)
 }
 
 func DivideN[T Number](u *UnusualNum, num T) *UnusualNum {
 	other := NewUnusualNum()
-	AddUnknownPossibility[T](other, num)
+	AddUnknownPossibility(other, num)
 	return u.Divide(other)
 }
 
