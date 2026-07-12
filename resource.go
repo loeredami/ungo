@@ -1,40 +1,38 @@
 package ungo
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 )
 
 func PackResources(file_paths []string, output_path string) {
-	WithTempFile(func(temp *os.File) {
-		table := NewSmallMap[string, []byte](len(file_paths))
-		for _, path := range file_paths {
-			data, err := os.ReadFile(path)
-			if err != nil {
-				continue
-			}
-			table.Set(path, data)
+	temp_data := bytes.NewBuffer(nil)
+	table := NewSmallMap[string, []byte](len(file_paths))
+	for _, path := range file_paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
 		}
+		table.Set(path, data)
+	}
 
-		header, data := func() ([][]byte, [][]byte) {
-			var headers [][]byte
-			var contents [][]byte
-			table.ForEach(func(name string, content []byte) {
-				headers = append(headers, []byte(name))
-				contents = append(contents, content)
-			})
-			return headers, contents
-		}()
+	header, data := func() ([][]byte, [][]byte) {
+		var headers [][]byte
+		var contents [][]byte
+		table.ForEach(func(name string, content []byte) {
+			headers = append(headers, []byte(name))
+			contents = append(contents, content)
+		})
+		return headers, contents
+	}()
 
-		for i, h := range header {
-			_, _ = temp.Write(h)
-			_, _ = temp.Write(data[i])
-		}
+	for i, h := range header {
+		_, _ = temp_data.Write(h)
+		_, _ = temp_data.Write(data[i])
+	}
 
-		var temp_data []byte
-		_, _ = temp.Read(temp_data)
-		os.WriteFile(output_path, temp_data, 0644)
-	})
+	os.WriteFile(output_path, temp_data.Bytes(), 0644)
 }
 
 type Package struct {
