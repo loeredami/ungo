@@ -18,7 +18,7 @@ func (l *Lazy[T]) ClearOnInit() {
 	l.onInit = make([]func(*T), 0)
 }
 
-func (l Lazy[T]) Value() T {
+func (l *Lazy[T]) Value() T {
 	if !l.value.HasValue() {
 		l.value = Optional[T]{value: l.initializer(), valid: true}
 		for _, f := range l.onInit {
